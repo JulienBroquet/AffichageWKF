@@ -1,0 +1,1836 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Affichage Kumite</title>
+<style>
+:root{
+  --aka:#d62839; --aka-d:#a51d2b; --aka-l:#fde8ea;
+  --ao:#1d4ed8;  --ao-d:#163a9e;  --ao-l:#e3eafc;
+  --ink:#16181d; --muted:#6b7280; --line:#e2e5ea; --bg:#f2f3f6; --card:#fff;
+  --warn:#ffcc00;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+[hidden]{display:none!important}
+button{font:inherit;cursor:pointer}
+input,select{font:inherit}
+
+/* =================== CONTROL =================== */
+.c-top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 16px;background:#1b1e24;color:#fff}
+.c-top .brand{font-weight:700;font-size:18px;margin-right:8px;letter-spacing:.3px}
+.c-top label{display:flex;align-items:center;gap:6px;font-size:13px;color:#c9ced8}
+.c-top input,.c-top select{padding:6px 8px;border-radius:6px;border:1px solid #3a3f4a;background:#2a2e37;color:#fff}
+.c-top input{width:150px}
+.c-top .spacer{flex:1}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;color:var(--ink);transition:transform .05s,filter .15s}
+.btn:hover{filter:brightness(.96)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:#2563eb;border-color:#2563eb;color:#fff}
+.btn.dark{background:#1b1e24;border-color:#1b1e24;color:#fff}
+.btn.ghost{background:transparent;border-color:#3a3f4a;color:#fff}
+.btn.danger{color:#b91c1c}
+.btn.sm{padding:5px 9px;font-size:13px}
+
+.c-main{padding:14px 16px;display:grid;gap:14px}
+.c-row{display:grid;grid-template-columns:1fr minmax(300px,380px) 1fr;gap:14px}
+@media (max-width:1050px){.c-row{grid-template-columns:1fr 1fr}.timercard{grid-column:1/-1;order:-1}}
+@media (max-width:640px){.c-row{grid-template-columns:1fr}}
+.card{background:var(--card);border-radius:12px;border:1px solid var(--line);padding:14px}
+
+.fighter{border-top:6px solid var(--aka)}
+.fighter.ao{border-top-color:var(--ao)}
+.fhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.tag{font-weight:800;letter-spacing:1px;padding:3px 10px;border-radius:6px;color:#fff;background:var(--aka)}
+.ao .tag{background:var(--ao)}
+.ftotal{font-size:44px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.ffields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.ffields label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:3px}
+.ffields input{padding:7px 9px;border:1px solid var(--line);border-radius:7px}
+.srow{display:grid;grid-template-columns:82px 36px 34px 1fr;gap:8px;align-items:center;margin-bottom:7px}
+.srow .lbl{font-weight:600;white-space:nowrap}
+.srow .val{font-size:22px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+.srow .minus{border:1px solid var(--line);background:#fff;border-radius:7px;height:40px}
+.srow .plus{border:0;border-radius:8px;height:46px;font-weight:700;font-size:16px;color:#fff;background:var(--aka)}
+.ao .srow .plus{background:var(--ao)}
+.srow .plus small{font-weight:500;opacity:.8;margin-left:4px}
+.pensec{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+.penrow{display:flex;align-items:center;gap:5px;margin-bottom:6px;flex-wrap:wrap}
+.penrow .pl{font-size:12px;color:var(--muted);width:52px}
+.penbtn{min-width:42px;height:34px;border-radius:7px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px}
+.penbtn.on{background:#f59e0b;border-color:#f59e0b;color:#111}
+.penbtn.on.hc{background:#ea580c;border-color:#ea580c;color:#fff}
+.penbtn.on.h{background:#111;border-color:#111;color:#fff}
+.factions{display:flex;gap:8px;margin-top:12px}
+.factions .btn{flex:1}
+.btn.toggled{background:#facc15;border-color:#eab308;font-weight:700}
+.btn.win{background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700}
+
+.timercard{display:flex;flex-direction:column;gap:10px;align-items:stretch;text-align:center}
+.phase{font-size:14px;font-weight:600;color:#374151;min-height:20px}
+.bigclock{font-size:68px;font-weight:800;font-variant-numeric:tabular-nums;background:#111;color:#fff;border-radius:12px;padding:4px 0;letter-spacing:2px}
+.bigclock.paused{color:#bfc4cc}
+.bigclock.warn{color:var(--warn)}
+.bigclock.ended{background:#b91c1c;color:#fff}
+.bigclock.off{font-size:22px;padding:22px 0;color:#bfc4cc}
+.startstop{height:58px;font-size:20px;font-weight:800;border-radius:10px;border:0;color:#fff;background:#16a34a}
+.startstop.running{background:#dc2626}
+.trow{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.trow .btn{flex:1}
+.trow input{width:70px;text-align:center;border:1px solid var(--line);border-radius:7px}
+.alertbox{background:#fef3c7;border:1px solid #fcd34d;color:#78350f;border-radius:8px;padding:8px;font-weight:600}
+.hint{font-size:12px;color:var(--muted);line-height:1.5;text-align:left}
+kbd{background:#eef0f3;border:1px solid #d5d9df;border-radius:4px;padding:0 4px;font-size:11px}
+
+.tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+.tabs button{border:0;background:none;padding:9px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent}
+.tabs button.on{color:var(--ink);border-bottom-color:#2563eb}
+.ctools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.ctools input[type=search]{padding:7px 9px;border:1px solid var(--line);border-radius:7px;min-width:200px}
+.addform{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;padding:10px;background:#f8f9fb;border-radius:8px}
+.addform input{padding:7px 9px;border:1px solid var(--line);border-radius:7px;flex:1;min-width:150px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+td.acts{white-space:nowrap;text-align:right}
+.pick-aka{background:var(--aka-l);border-color:#f5b5bc;color:var(--aka-d);font-weight:700}
+.pick-ao{background:var(--ao-l);border-color:#b4c6f5;color:var(--ao-d);font-weight:700}
+.empty{color:var(--muted);padding:18px;text-align:center}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.settings fieldset{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.settings legend{font-weight:700;padding:0 6px}
+.settings label{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:7px 0;font-size:14px}
+.settings input[type=number]{width:80px;padding:5px 7px;border:1px solid var(--line);border-radius:6px}
+.settings select{padding:5px 7px;border:1px solid var(--line);border-radius:6px}
+.previewwrap{position:relative;width:100%;max-width:960px;aspect-ratio:16/9;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#000}
+.msg{font-size:13px;color:#166534;margin-left:6px}
+
+/* =================== DISPLAY =================== */
+body.is-display{background:#000;overflow:hidden;cursor:default}
+.d-wrap{container-type:size;position:relative;width:100%;height:100%;overflow:hidden}
+#display .d-wrap{position:fixed;inset:0;width:auto;height:auto}
+.d-board{--u:min(1cqw,1.7778cqh);position:absolute;inset:0;display:grid;grid-template-rows:auto 1fr;background:#000;color:#fff;user-select:none}
+.d-top{display:flex;justify-content:space-between;align-items:center;padding:calc(var(--u)*.8) calc(var(--u)*2);background:#0d0f13;font-size:calc(var(--u)*2.1);font-weight:600;color:#cfd4dc;gap:calc(var(--u)*2)}
+.d-top .mid{color:#fff;font-weight:700;text-align:center;flex:1}
+.d-top span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-grid{display:grid;grid-template-columns:1fr calc(var(--u)*26) 1fr;min-height:0}
+.d-aka{order:1}.d-center{order:2}.d-ao{order:3}
+.d-grid.swap .d-aka{order:3}.d-grid.swap .d-ao{order:1}
+.d-half{position:relative;display:flex;flex-direction:column;align-items:center;padding:calc(var(--u)*1.6) calc(var(--u)*1.8);min-width:0;overflow:hidden}
+.d-aka{background:linear-gradient(180deg,#e0303f,#b81f2e)}
+.d-ao{background:linear-gradient(180deg,#2457e6,#173fb0)}
+.d-head{width:100%;display:flex;align-items:center;justify-content:space-between}
+.d-tag{font-size:calc(var(--u)*3.2);font-weight:900;letter-spacing:calc(var(--u)*.3)}
+.d-senshu{width:calc(var(--u)*5.2);height:calc(var(--u)*5.2);border-radius:50%;background:#ffd400;color:#111;font-weight:900;font-size:calc(var(--u)*3.4);display:grid;place-items:center;box-shadow:0 0 calc(var(--u)*1.5) rgba(255,212,0,.6)}
+.d-name{margin-top:calc(var(--u)*.6);font-size:calc(var(--u)*4.4);font-weight:800;text-align:center;line-height:1.08;width:100%;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.d-name.long{font-size:calc(var(--u)*3.5)}
+.d-name.xlong{font-size:calc(var(--u)*2.8)}
+.d-dojo{font-size:calc(var(--u)*2.4);opacity:.85;margin-top:calc(var(--u)*.4);text-align:center;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-score{flex:1;display:flex;align-items:center;justify-content:center;font-size:calc(var(--u)*21);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.2) rgba(0,0,0,.25)}
+.d-counts{display:flex;gap:calc(var(--u)*2.2);font-size:calc(var(--u)*2.3);font-weight:600;margin-bottom:calc(var(--u)*1.2)}
+.d-counts span{white-space:nowrap}
+.d-counts b{font-size:calc(var(--u)*3);margin-left:calc(var(--u)*.5)}
+.d-pens{display:flex;flex-direction:column;gap:calc(var(--u)*.7);align-items:center}
+.d-penrow{display:flex;gap:calc(var(--u)*.7);align-items:center}
+.d-pl{font-size:calc(var(--u)*1.5);opacity:.8;width:calc(var(--u)*5);text-align:right;margin-right:calc(var(--u)*.4)}
+.d-pill{min-width:calc(var(--u)*5);height:calc(var(--u)*3.3);border-radius:calc(var(--u)*.6);border:calc(var(--u)*.2) solid rgba(255,255,255,.45);display:grid;place-items:center;font-size:calc(var(--u)*1.7);font-weight:800;color:rgba(255,255,255,.45)}
+.d-pill.on{background:#ffd400;border-color:#ffd400;color:#111}
+.d-pill.on.hc{background:#ff8a00;border-color:#ff8a00}
+.d-pill.on.h{background:#111;border-color:#fff;color:#fff}
+.d-win{position:absolute;left:0;right:0;top:42%;transform:translateY(-50%) rotate(-4deg);text-align:center;font-size:calc(var(--u)*4.6);font-weight:900;letter-spacing:calc(var(--u)*.5);background:rgba(255,255,255,.95);color:#111;padding:calc(var(--u)*.6) 0;box-shadow:0 0 calc(var(--u)*3) rgba(0,0,0,.4)}
+.d-half.lost{filter:saturate(.35) brightness(.55)}
+.d-center{background:#0b0c10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--u)*1.4);padding:calc(var(--u)*1);text-align:center}
+.d-mode{font-size:calc(var(--u)*1.8);color:#9aa3b2;font-weight:700;letter-spacing:calc(var(--u)*.2);text-transform:uppercase}
+.d-clock{font-size:calc(var(--u)*7);font-weight:800;font-variant-numeric:tabular-nums;line-height:1;padding:calc(var(--u)*1) calc(var(--u)*1.2);border-radius:calc(var(--u)*1);border:calc(var(--u)*.3) solid #2a2e37;color:#fff}
+.d-clock.paused{color:#c5cad3}
+.d-clock.warn{color:var(--warn);border-color:var(--warn);animation:pulse 1s infinite}
+.d-clock.ended{background:#d61f2c;border-color:#d61f2c;color:#fff;animation:none}
+@keyframes pulse{50%{box-shadow:0 0 calc(var(--u)*3) rgba(255,204,0,.6)}}
+.d-atoshi{font-size:calc(var(--u)*1.9);font-weight:800;color:var(--warn);letter-spacing:calc(var(--u)*.15)}
+.d-phase-n{font-size:calc(var(--u)*3);font-weight:800}
+.d-phase-t{font-size:calc(var(--u)*2.1);font-weight:600;color:#e5e7eb;line-height:1.25}
+.d-phase-t .a{color:#ff6b78}.d-phase-t .b{color:#7da2ff}
+/* pool – control */
+.flow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;border-left:6px solid #2563eb}
+.flow-info{display:flex;flex-direction:column;gap:2px;min-width:220px;flex:1}
+.flow-info b{font-size:16px}
+.flow-info span{font-size:14px;color:#374151}
+.flow-screens{display:flex;gap:4px;align-items:center;font-size:13px;color:var(--muted)}
+.flow-screens button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:6px 10px;font-size:13px}
+.flow-screens button.on{background:#1b1e24;color:#fff;border-color:#1b1e24}
+.flow-acts{display:flex;gap:8px;flex-wrap:wrap}
+.flow-acts .btn{font-weight:700}
+.pchecks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;margin:10px 0;max-height:320px;overflow:auto;padding:4px}
+.pchecks label{display:flex;gap:8px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:14px;cursor:pointer}
+.pchecks label small{color:var(--muted);display:block}
+.pchecks input{width:18px;height:18px}
+.ctools label.f{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.ctools label.f input,.ctools label.f select{padding:6px 8px;border:1px solid var(--line);border-radius:7px;color:var(--ink)}
+.pgrid{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
+@media (max-width:900px){.pgrid{grid-template-columns:1fr}}
+.pgrid h4{margin:4px 0 8px}
+tr.cur td{background:#eef4ff}
+td.res{white-space:nowrap;font-variant-numeric:tabular-nums;text-align:center}
+.wa{color:var(--aka-d);font-weight:700}.wb{color:var(--ao-d);font-weight:700}
+.st{font-size:12px;padding:2px 7px;border-radius:10px;background:#eef0f3;color:#4b5563;white-space:nowrap}
+.st.done{background:#dcfce7;color:#166534}.st.now{background:#dbeafe;color:#1e40af}
+
+/* pools library */
+.pcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:12px}
+.pcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;background:#fff}
+.pcard.active{border-color:#2563eb;box-shadow:0 0 0 2px #bfd3fb}
+.pcard.editing{border-color:#f59e0b;box-shadow:0 0 0 2px #fde68a}
+.pc-top{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.pc-top b{font-size:15px}
+.badge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;background:#eef0f3;color:#374151;white-space:nowrap}
+.badge.auto{background:#ede9fe;color:#5b21b6}
+.pc-meta{font-size:13px;color:#374151}
+.pc-crit{font-size:12px;color:var(--muted);min-height:15px}
+.pc-acts{display:flex;gap:5px;flex-wrap:wrap;margin-top:3px}
+.pwarn{background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:10px}
+.editor{border:1px solid #fcd34d;background:#fffdf5;border-radius:10px;padding:12px;margin-bottom:14px}
+.editor h4{margin:0 0 10px}
+.egrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px;margin-bottom:10px}
+.egrid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.egrid input,.egrid select{padding:7px 9px;border:1px solid var(--line);border-radius:7px;color:var(--ink);background:#fff}
+.range{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink)}
+.range input,.range select{flex:1;min-width:0}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}
+.chip{font-size:12px;background:#eef2ff;color:#1e3a8a;border-radius:12px;padding:3px 9px}
+.chip small{color:#64748b}
+.addform select{padding:7px 9px;border:1px solid var(--line);border-radius:7px}
+.addform input.sm{flex:0 1 90px;min-width:80px}
+
+/* pool – display screens */
+.d-screen{--u:min(1cqw,1.7778cqh);position:absolute;inset:0;background:#0b0c10;color:#fff;display:flex;flex-direction:column;z-index:2}
+.d-sh{display:flex;justify-content:space-between;align-items:baseline;gap:calc(var(--u)*2);padding:calc(var(--u)*2.2) calc(var(--u)*3) calc(var(--u)*1.2)}
+.d-sh .t{font-size:calc(var(--u)*4.2);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-sh .r{font-size:calc(var(--u)*2.1);color:#9aa3b2;font-weight:600;white-space:nowrap}
+.d-sub{padding:0 calc(var(--u)*3);font-size:calc(var(--u)*2.2);color:#cbd2dc;font-weight:600;margin-bottom:calc(var(--u)*1.4)}
+.d-plist{flex:1;display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:calc(var(--u)*1.2);padding:0 calc(var(--u)*3) calc(var(--u)*3);align-content:start;font-size:var(--fs)}
+.d-pc{background:#1a1d24;border-radius:calc(var(--u)*1);padding:.55em .8em;display:flex;gap:.7em;align-items:center;min-width:0}
+.d-pc .n{width:1.8em;height:1.8em;border-radius:50%;background:#2a2f3a;display:grid;place-items:center;font-weight:800;font-size:.8em;flex:none}
+.d-pc .nm{font-weight:800;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-pc .dj{font-size:.62em;color:#aab2bf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-pc>div{min-width:0}
+.d-call{flex:1;display:grid;grid-template-columns:1fr 1fr;position:relative;min-height:0}
+.d-call.swap .ca{order:2}
+.d-call .ca,.d-call .cb{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:calc(var(--u)*3);gap:calc(var(--u)*1.2);min-width:0}
+.d-call .ca{background:linear-gradient(180deg,#e0303f,#b81f2e)}
+.d-call .cb{background:linear-gradient(180deg,#2457e6,#173fb0)}
+.d-call .tg{font-size:calc(var(--u)*4);font-weight:900;letter-spacing:calc(var(--u)*.4);opacity:.9}
+.d-call .nm{font-size:calc(var(--u)*6.4);font-weight:900;line-height:1.05;overflow-wrap:anywhere}
+.d-call .dj{font-size:calc(var(--u)*3);opacity:.9}
+.d-vs{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:calc(var(--u)*10);height:calc(var(--u)*10);border-radius:50%;background:#0b0c10;display:grid;place-items:center;font-size:calc(var(--u)*3.6);font-weight:900;border:calc(var(--u)*.4) solid #fff}
+.d-next{padding:calc(var(--u)*1.4) calc(var(--u)*3);font-size:calc(var(--u)*2.4);color:#cbd2dc;text-align:center}
+.d-next b{color:#fff}
+.d-rank{flex:1;padding:0 calc(var(--u)*3) calc(var(--u)*2.5);font-size:var(--fs);min-height:0}
+.d-rank table{font-size:inherit;width:100%;border-collapse:separate;border-spacing:0 .25em}
+.d-rank th{font-size:.55em;color:#9aa3b2;text-transform:uppercase;letter-spacing:.08em;font-weight:700;border:0;padding:0 .6em;text-align:center}
+.d-rank th.l{text-align:left}
+.d-rank td{background:#1a1d24;border:0;padding:.35em .6em;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.d-rank td:first-child{border-radius:.3em 0 0 .3em;width:2.4em}
+.d-rank td:last-child{border-radius:0 .3em .3em 0}
+.d-rank td.l{text-align:left}
+.d-rank td.l small{display:block;font-size:.6em;color:#aab2bf;font-weight:600}
+.d-rank .key{color:#ffd400}
+.d-rank .rk{display:inline-grid;place-items:center;width:1.6em;height:1.6em;border-radius:50%;background:#2a2f3a}
+.d-rank tr.r1 .rk{background:#e8b923;color:#111}.d-rank tr.r2 .rk{background:#c0c6cf;color:#111}.d-rank tr.r3 .rk{background:#c98446;color:#111}
+.d-bracket{flex:1;display:flex;flex-direction:column;gap:calc(var(--u)*1.2);padding:0 calc(var(--u)*2.5) calc(var(--u)*2);font-size:var(--fs);min-height:0}
+.bmain{flex:1;display:flex;gap:1.2em;min-height:0;overflow:hidden}
+.bm.bye{opacity:.75}
+.bm.bye .br{border-top:0}
+.bcol{flex:1;display:flex;flex-direction:column;min-width:0}
+.bcol.win{flex:.8}
+.bh{font-size:.62em;color:#9aa3b2;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:.4em;text-align:center}
+.bbody{flex:1;display:flex;flex-direction:column;justify-content:space-around;gap:.3em}
+.bm{background:#1a1d24;border-radius:.35em;overflow:hidden;border:.12em solid transparent}
+.bm.cur{border-color:#ffd400;box-shadow:0 0 .8em rgba(255,212,0,.35)}
+.br{display:flex;justify-content:space-between;gap:.5em;padding:.28em .55em;font-weight:700;white-space:nowrap}
+.br span{overflow:hidden;text-overflow:ellipsis}
+.br.a{border-left:.3em solid #e0303f}.br.b{border-left:.3em solid #2457e6;border-top:1px solid #2a2f3a}
+.br.w{color:#fff}.br.w b{color:#ffd400}.br.l{color:#6b7280}
+.br i{font-style:normal;font-weight:500;color:#6b7280}
+.bwin{background:#e8b923;color:#111;font-weight:900;text-align:center;padding:.6em;border-radius:.4em;font-size:1.15em;overflow-wrap:anywhere}
+.brep{display:flex;gap:1.5em;flex:none}
+.brs{flex:1;min-width:0}
+.brow{display:flex;align-items:center;gap:.4em;flex-wrap:nowrap;min-width:0}
+.brow .bm{min-width:0;flex:1 1 0;max-width:14em}
+.brow .arr{color:#6b7280}
+.brow .note{color:#9aa3b2;font-size:.85em}
+@supports not (width:1cqw){.d-board,.d-screen{--u:min(1vw,1.7778vh)}}
+.d-hint{position:fixed;left:50%;bottom:3vh;transform:translateX(-50%);background:rgba(255,255,255,.92);color:#111;padding:10px 18px;border-radius:10px;font-size:15px;font-weight:600;transition:opacity .6s;cursor:pointer;z-index:5}
+</style>
+</head>
+<body>
+
+<!-- ============ CONTROL ============ -->
+<div id="control" hidden>
+  <header class="c-top">
+    <div class="brand">Affichage Kumite</div>
+    <label>Mode
+      <select id="mode">
+        <option value="wkf">WKF</option>
+        <option value="k4x15">4 × 15</option>
+        <option value="promo">Promo</option>
+      </select>
+    </label>
+    <label>Tatami <input id="tatami" placeholder="Tatami 1"></label>
+    <label>Catégorie <input id="category" placeholder="U14 F -42 kg"></label>
+    <div class="spacer"></div>
+    <button class="btn ghost" id="quickSave" title="Télécharger une sauvegarde complète (.json)">💾 Sauvegarder</button>
+    <button class="btn primary" id="openDisplay">Ouvrir l'affichage ↗</button>
+  </header>
+
+  <main class="c-main">
+    <section class="card flow" id="flow" hidden>
+      <div class="flow-info"><b id="flTitle"></b><span id="flMatch"></span></div>
+      <div class="flow-screens">Écran :
+        <button data-screen="list">Liste</button><button data-screen="bracket">Tableau</button><button data-screen="callup">Appel</button><button data-screen="score">Score</button><button data-screen="ranking">Classement</button>
+      </div>
+      <div class="flow-acts">
+        <button class="btn primary" id="flStart">▶ Lancer le pool</button>
+        <button class="btn dark" id="flHajime">Afficher le score</button>
+        <button class="btn win" id="flFinish">Terminer le combat ▶ suivant</button>
+        <button class="btn primary" id="flNextPool">Pool suivant ▶</button>
+      </div>
+    </section>
+    <section class="c-row">
+      <div class="card fighter aka" id="f-aka"></div>
+
+      <div class="card timercard">
+        <div class="phase" id="cPhase"></div>
+        <div class="bigclock" id="cClock">03:00</div>
+        <button class="startstop tctl" id="startStop">▶ Démarrer</button>
+        <div class="trow tctl">
+          <button class="btn sm" data-adj="-10000">−10 s</button>
+          <button class="btn sm" data-adj="-1000">−1 s</button>
+          <button class="btn sm" data-adj="1000">+1 s</button>
+          <button class="btn sm" data-adj="10000">+10 s</button>
+        </div>
+        <div class="trow tctl">
+          <button class="btn sm" id="resetTimer">↺ Remettre le temps</button>
+          <input id="setTime" placeholder="m:ss">
+          <button class="btn sm" id="applyTime">Régler</button>
+        </div>
+        <div class="trow" id="phaseCtl">
+          <button class="btn sm" id="prevPhase">◀</button>
+          <button class="btn sm dark" id="nextPhase">Phase suivante ▶</button>
+        </div>
+        <div class="alertbox" id="cAlert" hidden></div>
+        <div class="trow">
+          <button class="btn sm" id="undo">↶ Annuler</button>
+          <button class="btn sm" id="swapSides">⇄ Côtés écran</button>
+          <button class="btn sm danger" id="newMatch">Nouveau combat</button>
+        </div>
+        <div class="hint">
+          <kbd>Espace</kbd> départ / arrêt ·
+          AKA <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · AO <kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> = Yuko / Waza-ari / Ippon
+          (<kbd>Maj</kbd> pour retirer) · <kbd>N</kbd> phase suivante · <kbd>Ctrl</kbd>+<kbd>Z</kbd> annuler
+        </div>
+      </div>
+
+      <div class="card fighter ao" id="f-ao"></div>
+    </section>
+
+    <section class="card">
+      <div class="tabs">
+        <button data-tab="comp" class="on">Compétiteurs</button>
+        <button data-tab="pool">Pools</button>
+        <button data-tab="settings">Réglages</button>
+        <button data-tab="preview">Aperçu de l'écran</button>
+        <button data-tab="backup">Sauvegarde &amp; export</button>
+      </div>
+
+      <div data-pane="comp">
+        <div class="ctools">
+          <label class="btn sm">Importer un CSV…<input type="file" id="csvFile" accept=".csv,.txt,text/csv" hidden></label>
+          <button class="btn sm" id="dlTemplate">Télécharger un modèle CSV</button>
+          <input type="search" id="search" placeholder="Rechercher nom, dojo, grade…">
+          <span class="msg" id="compMsg"></span>
+          <div class="spacer" style="flex:1"></div>
+          <button class="btn sm danger" id="clearList">Vider la liste</button>
+        </div>
+        <form class="addform" id="addForm">
+          <input name="name" placeholder="Nom et prénom" required>
+          <input name="dojo" placeholder="Dojo / club">
+          <select name="sex" title="Sexe"><option value="">Sexe</option><option value="F">F</option><option value="M">M</option></select>
+          <input name="age" class="sm" type="number" min="3" max="99" placeholder="Âge">
+          <input name="weight" class="sm" type="number" min="10" max="200" step="0.1" placeholder="kg">
+          <select name="grade" id="fGrade" title="Grade"></select>
+          <input name="category" class="sm" placeholder="Catégorie">
+          <button class="btn primary sm" id="addBtn">Ajouter</button>
+          <button type="button" class="btn sm" id="cancelEdit" hidden>Annuler</button>
+        </form>
+        <table>
+          <thead><tr><th>Nom</th><th>Dojo</th><th>Sexe</th><th>Âge</th><th>Poids</th><th>Grade</th><th>Catégorie</th><th></th></tr></thead>
+          <tbody id="compBody"></tbody>
+        </table>
+      </div>
+
+      <div data-pane="pool" hidden>
+        <div class="ctools">
+          <b style="font-size:16px">Pools préparés</b>
+          <span class="hint">Préparez tous vos pools à l'avance, puis envoyez-les sur le tatami un par un.</span>
+          <div class="spacer" style="flex:1"></div>
+          <button class="btn primary sm" id="pNew">+ Nouveau pool</button>
+        </div>
+        <div id="poolWarn"></div>
+        <div class="pcards" id="poolCards"></div>
+
+        <div class="editor" id="poolEditor" hidden>
+          <h4 id="eTitle">Nouveau pool</h4>
+          <div class="pwarn" id="eLocked" hidden>Ce pool a déjà des résultats : la liste des compétiteurs est figée. Seuls le nom, le mode et le classement peuvent être modifiés.</div>
+          <div class="egrid">
+            <label>Nom du pool<input id="eName" placeholder="ex. U12 Filles -30 kg"></label>
+            <label>Type
+              <select id="eType"><option value="auto">Automatique (critères)</option><option value="manual">Manuel (je choisis)</option></select>
+            </label>
+            <label>Mode de combat
+              <select id="eMode"><option value="wkf">WKF</option><option value="k4x15">4 × 15</option><option value="promo">Promo</option></select>
+            </label>
+            <label>Format
+              <select id="eFormat"><option value="rr">Poule (chacun contre chacun)</option><option value="ko">Élimination directe (tableau)</option></select>
+            </label>
+            <label id="eRankWrap">Classement
+              <select id="eRank"><option value="standard">Standard (victoires)</option><option value="points">Aux points marqués</option></select>
+            </label>
+            <label id="eRepWrap" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-size:14px"><input type="checkbox" id="eRep" checked> Avec repêchage (WKF)</label>
+          </div>
+          <div id="eAuto">
+            <div class="egrid">
+              <label>Sexe
+                <select id="eSex"><option value="">Tous</option><option value="F">Filles / Femmes</option><option value="M">Garçons / Hommes</option></select>
+              </label>
+              <label>Âge (ans, inclus)<span class="range"><input id="eAgeMin" type="number" placeholder="de"> à <input id="eAgeMax" type="number" placeholder="à"></span></label>
+              <label>Poids (kg) : plus de … jusqu'à …<span class="range"><input id="eWMin" type="number" step="0.1" placeholder="plus de"> à <input id="eWMax" type="number" step="0.1" placeholder="jusqu'à"></span></label>
+              <label>Grade (inclus)<span class="range"><select id="eGMin"></select> à <select id="eGMax"></select></span></label>
+            </div>
+          </div>
+          <div id="eManual">
+            <div class="ctools">
+              <label class="f">Catégorie <select id="eCat"></select></label>
+              <input type="search" id="eSearch" placeholder="Filtrer…">
+              <button type="button" class="btn sm" id="eAll">Cocher les visibles</button>
+              <button type="button" class="btn sm" id="eNone">Tout décocher</button>
+            </div>
+            <div class="pchecks" id="eChecks"></div>
+          </div>
+          <div><b id="eCount"></b></div>
+          <div class="chips" id="ePreview"></div>
+          <div class="trow" style="justify-content:flex-start">
+            <button class="btn primary" id="eSave">Enregistrer le pool</button>
+            <button class="btn" id="eCancel">Annuler</button>
+          </div>
+        </div>
+
+        <div id="poolView" hidden>
+          <div class="ctools">
+            <b id="pvName" style="font-size:17px"></b>
+            <label class="f">Classement
+              <select id="pvRank"><option value="standard">Standard (victoires)</option><option value="points">Aux points marqués</option></select>
+            </label>
+            <div class="spacer" style="flex:1"></div>
+            <button class="btn sm" id="pUnload">Retirer du tatami</button>
+          </div>
+          <div class="pgrid">
+            <div><h4>Combats</h4><table><thead><tr><th>#</th><th>AKA</th><th style="text-align:center">Score</th><th>AO</th><th></th><th></th></tr></thead><tbody id="pvMatches"></tbody></table></div>
+            <div><h4>Classement</h4><table><thead><tr><th>Rg</th><th>Nom</th><th>V</th><th>D</th><th>Pts +</th><th>Pts −</th></tr></thead><tbody id="pvRanking"></tbody></table></div>
+          </div>
+          <p class="hint" id="pvHint">Classement standard : victoires, puis confrontation directe, puis points marqués, puis points encaissés. Classement aux points : points marqués, puis victoires, puis points encaissés.</p>
+        </div>
+      </div>
+
+      <div data-pane="settings" hidden>
+        <div class="settings">
+          <fieldset>
+            <legend>Mode WKF</legend>
+            <label>Durée du combat (s) <input type="number" min="10" step="5" data-set="wkf.duration"></label>
+            <label>Atoshi baraku à (s restantes) <input type="number" min="0" data-set="wkf.atoshi"></label>
+            <label>Écart de victoire (points, 0 = aucun) <input type="number" min="0" data-set="wkf.gap"></label>
+            <label>Senshu automatique au 1er point <input type="checkbox" data-set="wkf.autoSenshu"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Mode 4 × 15</legend>
+            <label>Durée d'un assaut (s) <input type="number" min="5" data-set="k4x15.duration"></label>
+            <label>Signal avant la fin (s, 0 = aucun) <input type="number" min="0" data-set="k4x15.atoshi"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Mode Promo</legend>
+            <label>Afficher un chronomètre <input type="checkbox" data-set="promo.useTimer"></label>
+            <label>Durée (s) <input type="number" min="5" data-set="promo.duration"></label>
+            <label>Signal avant la fin (s, 0 = aucun) <input type="number" min="0" data-set="promo.atoshi"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Son</legend>
+            <label>Jouer les signaux sur
+              <select data-set="sound.out">
+                <option value="control">l'ordinateur de gestion</option>
+                <option value="display">la fenêtre d'affichage</option>
+                <option value="both">les deux</option>
+              </select>
+            </label>
+            <label>Volume <input type="range" min="0" max="1" step="0.05" data-set="sound.volume"></label>
+            <div class="trow" style="justify-content:flex-start">
+              <button class="btn sm" id="testAtoshi">Tester atoshi baraku</button>
+              <button class="btn sm" id="testEnd">Tester fin du temps</button>
+            </div>
+          </fieldset>
+        </div>
+        <p class="hint" style="margin-top:12px">Les réglages, le combat en cours et la liste des compétiteurs sont enregistrés dans ce navigateur. Pénalités : en WKF une seule catégorie (C1, C2, C3, HC, H) ; en Promo et 4 × 15 deux catégories (règlement enfants SKF).</p>
+        <button class="btn sm danger" id="factoryReset">Réinitialiser les réglages</button>
+      </div>
+
+      <div data-pane="backup" hidden>
+        <div class="settings">
+          <fieldset>
+            <legend>Sauvegarde complète</legend>
+            <p class="hint">Un seul fichier <b>.json</b> contient tout : compétiteurs, pools, résultats, réglages et combat en cours. Gardez-le sur une clé USB et faites-en une à chaque étape importante (après l'inscription, après la pesée, entre les pools).</p>
+            <div class="trow" style="justify-content:flex-start">
+              <button class="btn primary sm" id="bkSave">💾 Télécharger la sauvegarde</button>
+              <label class="btn sm">📂 Restaurer une sauvegarde…<input type="file" id="bkLoad" accept=".json,application/json" hidden></label>
+            </div>
+            <p class="hint" id="bkInfo"></p>
+          </fieldset>
+          <fieldset>
+            <legend>Export des résultats (Excel)</legend>
+            <p class="hint">Fichiers <b>.csv</b> (séparateur « ; ») qui s'ouvrent directement dans Excel ou LibreOffice. Seuls les pools ayant au moins un combat joué sont exportés.</p>
+            <div class="trow" style="justify-content:flex-start">
+              <button class="btn sm" id="exRank">📊 Classements (CSV)</button>
+              <button class="btn sm" id="exMatches">🥋 Tous les combats (CSV)</button>
+              <button class="btn sm" id="exComp">👥 Liste des compétiteurs (CSV)</button>
+            </div>
+          </fieldset>
+        </div>
+      </div>
+
+      <div data-pane="preview" hidden>
+        <div class="previewwrap"><div class="d-wrap" id="previewRoot"></div></div>
+        <p class="hint">Pour le tatami : cliquez « Ouvrir l'affichage », glissez la fenêtre sur l'écran / la TV, puis cliquez dedans pour passer en plein écran (double-clic pour en sortir).</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============ DISPLAY ============ -->
+<div id="display" hidden>
+  <div class="d-wrap" id="displayRoot"></div>
+  <div class="d-hint" id="dHint">Cliquez pour passer en plein écran et activer le son</div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const KEY = 'kumiteScore.state.v1';
+const KEY_COMP = 'kumiteScore.competitors.v1';
+const HASH = location.hash || '';
+const IS_DISPLAY = HASH.startsWith('#display');
+const BASE = location.href.split('#')[0];
+
+const MODES = { wkf:'WKF', k4x15:'4 × 15', promo:'Promo' };
+const PEN = ['C1','C2','C3','HC','H'];
+const PHASES = {
+  k4x15: [
+    ['AKA', 'attaque', null],
+    ['AO', 'attaque', null],
+    ['AKA', 'attaque', 'AO contre'],
+    ['AO', 'attaque', 'AKA contre'],
+  ],
+  promo: [
+    ['AKA', '1re attaque', null],
+    ['AKA', '2e attaque', 'AO contre'],
+    ['AO', '1re attaque', null],
+    ['AO', '2e attaque', 'AKA contre'],
+  ]
+};
+const DEFAULT_SETTINGS = {
+  wkf:   { duration:180, atoshi:15, gap:8, autoSenshu:true },
+  k4x15: { duration:15,  atoshi:0 },
+  promo: { useTimer:false, duration:60, atoshi:0 },
+  sound: { out:'control', volume:0.8 }
+};
+const clone = o => JSON.parse(JSON.stringify(o));
+const fighter = () => ({ name:'', dojo:'', yuko:0, waza:0, ippon:0, p1:0, p2:0, senshu:false });
+const total = f => f.yuko + 2*f.waza + 3*f.ippon;
+
+function newState(){
+  const s = { mode:'wkf', settings:clone(DEFAULT_SETTINGS), tatami:'Tatami 1', category:'', swap:false,
+    aka:fighter(), ao:fighter(), phase:0, winner:null,
+    timer:{ running:false, remaining:180000, endAt:0 } };
+  return s;
+}
+function load(key, fallback){
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch(e){ return fallback; }
+}
+function save(key, v){ try { localStorage.setItem(key, JSON.stringify(v)); } catch(e){} }
+
+let state = load(KEY, null) || newState();
+// merge settings defaults (forward compat)
+for (const k in DEFAULT_SETTINGS) state.settings[k] = Object.assign({}, DEFAULT_SETTINGS[k], state.settings[k]||{});
+
+if (!('screen' in state)) state.screen = 'score';
+if (!('pool' in state)) state.pool = null;
+const cfg = (s=state) => s.settings[s.mode];
+const totalMs = (s=state) => cfg(s).duration * 1000;
+const atoshiMs = (s=state) => (cfg(s).atoshi||0) * 1000;
+const timerOn = (s=state) => s.mode !== 'promo' || s.settings.promo.useTimer;
+const remainingNow = (s=state) => s.timer.running ? Math.max(0, s.timer.endAt - Date.now()) : s.timer.remaining;
+function fmt(ms){
+  const t = Math.ceil(ms/1000);
+  return String(Math.floor(t/60)).padStart(2,'0') + ':' + String(t%60).padStart(2,'0');
+}
+const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- sync ---------- */
+let chan = null;
+try { chan = new BroadcastChannel('kumite-score'); } catch(e){}
+function broadcast(msg){ if (chan) try { chan.postMessage(msg); } catch(e){} }
+
+/* ---------- audio ---------- */
+let actx = null;
+function audio(){
+  if (!actx) { const A = window.AudioContext || window.webkitAudioContext; if (!A) return null; actx = new A(); }
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(freq, start, dur, type, vol){
+  const a = audio(); if (!a) return;
+  const t0 = a.currentTime + start;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t0 + 0.01);
+  g.gain.setValueAtTime(Math.max(0.0002, vol), t0 + dur - 0.04);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+function playLocal(kind){
+  const v = state.settings.sound.volume;
+  if (v <= 0) return;
+  if (kind === 'atoshi'){
+    tone(1046, 0, 0.22, 'square', 0.35*v);
+    tone(1046, 0.32, 0.22, 'square', 0.35*v);
+  } else {
+    tone(392, 0, 1.6, 'sawtooth', 0.45*v);
+    tone(494, 0, 1.6, 'square', 0.25*v);
+  }
+}
+
+/* =====================================================================
+   DISPLAY
+   ===================================================================== */
+/* ---------- pool helpers ---------- */
+function roundRobin(n){
+  const ids = [...Array(n).keys()]; if (n % 2) ids.push(null);
+  const m = ids.length, out = []; let arr = ids.slice();
+  for (let r = 0; r < m - 1; r++){
+    for (let i = 0; i < m/2; i++){
+      const a = arr[i], b = arr[m-1-i];
+      if (a !== null && b !== null) out.push(r % 2 ? [b, a] : [a, b]);
+    }
+    arr = [arr[0], arr[m-1], ...arr.slice(1, m-1)];
+  }
+  return out;
+}
+function poolTable(pool){
+  if (pool.format === 'ko') return koRanking(pool);
+  const P = pool.participants.map((p,i) => ({ i, name:p.name, dojo:p.dojo, j:0, w:0, l:0, pf:0, pa:0 }));
+  const h2h = {};
+  for (const m of pool.matches){
+    if (!m.res || m.res.bye) continue;
+    const A = P[m.a], B = P[m.b];
+    A.j++; B.j++; A.pf += m.res.sa; A.pa += m.res.sb; B.pf += m.res.sb; B.pa += m.res.sa;
+    const wi = m.res.winner === 'aka' ? m.a : m.b, li = m.res.winner === 'aka' ? m.b : m.a;
+    P[wi].w++; P[li].l++; h2h[wi+'>'+li] = 1;
+  }
+  if (pool.ranking === 'points'){
+    const cmp = (x,y) => y.pf - x.pf || y.w - x.w || x.pa - y.pa;
+    P.sort(cmp);
+    P.forEach((p,k) => p.rank = (k > 0 && cmp(P[k-1], p) === 0) ? P[k-1].rank : k + 1);
+  } else {
+    // victoires ; à égalité entre 2 : confrontation directe ; à 3+ : points marqués puis encaissés
+    const base = (x,y) => y.w - x.w || y.pf - x.pf || x.pa - y.pa;
+    P.sort(base);
+    const out = [];
+    for (let k = 0; k < P.length;){
+      let e = k; while (e + 1 < P.length && P[e+1].w === P[k].w) e++;
+      const g = P.slice(k, e + 1);
+      if (g.length === 2){
+        const [x,y] = g;
+        if (h2h[y.i+'>'+x.i]) g.reverse();
+        g[0].rank = out.length + 1;
+        g[1].rank = (h2h[x.i+'>'+y.i] || h2h[y.i+'>'+x.i]) ? out.length + 2 : (base(g[0],g[1]) === 0 ? g[0].rank : out.length + 2);
+      } else g.forEach((p,j) => p.rank = (j > 0 && base(g[j-1], p) === 0) ? g[j-1].rank : out.length + j + 1);
+      out.push(...g); k = e + 1;
+    }
+    P.splice(0, P.length, ...out);
+  }
+  return P;
+}
+const uid = () => Math.random().toString(36).slice(2, 10);
+const GRADES = [];
+for (let k = 9; k >= 1; k--) GRADES.push([10-k, k + (k===1 ? 'er' : 'e') + ' kyu']);
+for (let d = 1; d <= 6; d++) GRADES.push([9+d, d + (d===1 ? 'er' : 'e') + ' dan']);
+const gradeLabel = v => (GRADES.find(g => g[0] === +v) || [0, ''])[1];
+const gradeOptions = (empty) => `<option value="">${empty}</option>` + GRADES.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+const BELTS = { blanche:1, blanc:1, jaune:2, orange:3, verte:4, vert:4, bleue:5, bleu:5, violette:6, violet:6, marron:7, brune:7, brun:7, noire:10, noir:10 };
+function parseGrade(str){
+  const t = String(str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const m = t.match(/(\d+)\s*(?:er|re|eme|e|st|nd|rd|th|\.)?\s*(kyu|dan)/);
+  if (m){ const n = +m[1]; return m[2] === 'kyu' ? Math.min(9, Math.max(1, 10-n)) : 9 + Math.min(6, Math.max(1, n)); }
+  for (const k in BELTS) if (t.includes(k)) return BELTS[k];
+  return null;
+}
+function matchesCrit(c, k){
+  if (k.sex && c.sex !== k.sex) return false;
+  const chk = (v, min, max, minExcl) => {
+    if (min == null && max == null) return true;
+    if (v == null || v === '' || isNaN(v)) return false;
+    if (min != null && (minExcl ? !(v > min) : !(v >= min))) return false;
+    if (max != null && !(v <= max)) return false;
+    return true;
+  };
+  return chk(c.age, k.ageMin, k.ageMax) && chk(c.weight, k.wMin, k.wMax, true) && chk(c.grade, k.gMin, k.gMax);
+}
+function critSummary(p){
+  if (!p || p.type !== 'auto') return '';
+  const k = p.criteria || {}, out = [];
+  const nn = v => v != null;
+  if (k.sex) out.push(k.sex === 'F' ? 'Filles' : 'Garçons');
+  if (nn(k.ageMin) || nn(k.ageMax)) out.push(nn(k.ageMin) && nn(k.ageMax) ? `${k.ageMin}–${k.ageMax} ans` : nn(k.ageMin) ? `${k.ageMin} ans et +` : `jusqu'à ${k.ageMax} ans`);
+  if (nn(k.wMin) || nn(k.wMax)) out.push(nn(k.wMin) && nn(k.wMax) ? `${k.wMin}–${k.wMax} kg` : nn(k.wMax) ? `−${k.wMax} kg` : `+${k.wMin} kg`);
+  if (nn(k.gMin) || nn(k.gMax)) out.push(nn(k.gMin) && nn(k.gMax) ? (k.gMin === k.gMax ? gradeLabel(k.gMin) : `${gradeLabel(k.gMin)} → ${gradeLabel(k.gMax)}`) : nn(k.gMin) ? `dès ${gradeLabel(k.gMin)}` : `jusqu'au ${gradeLabel(k.gMax)}`);
+  return out.join(' · ');
+}
+/* ---------- élimination directe ---------- */
+const isBye = m => !!(m.res && m.res.bye);
+const winnerOf = m => !m || !m.res ? null : (m.res.winner === 'aka' ? m.a : m.b);
+const loserOf  = m => !m || !m.res || m.res.bye ? null : (m.res.winner === 'aka' ? m.b : m.a);
+const playable = m => !m.res && m.a != null && m.b != null && m.a >= 0 && m.b >= 0;
+function koSize(n){ let S = 2; while (S < n) S *= 2; return S; }
+function seedOrder(S){
+  let arr = [1];
+  while (arr.length < S){ const L = arr.length * 2; arr = arr.flatMap(x => [x, L + 1 - x]); }
+  return arr;
+}
+function koRounds(pool){ return Math.log2(koSize(pool.participants.length)); }
+const mainM = (pool, r, k) => pool.matches.find(m => m.kind === 'main' && m.r === r && m.k === k);
+function roundName(R, r){
+  const d = R - 1 - r;
+  return ['Finale', 'Demi-finale', 'Quart de finale', '8e de finale', '16e de finale', '32e de finale'][d] || `Tour ${r+1}`;
+}
+function makeDraw(members){
+  const n = members.length, S = koSize(n), order = seedOrder(S);
+  let best = null, bestScore = Infinity;
+  for (let t = 0; t < 400 && bestScore > 0; t++){
+    const a = members.slice();
+    for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    let score = 0;
+    for (let k = 0; k < S/2; k++){
+      const x = a[order[2*k]-1], y = a[order[2*k+1]-1];
+      if (x && y && x.dojo && x.dojo === y.dojo) score++;
+    }
+    if (score < bestScore){ bestScore = score; best = a; }
+  }
+  return best.map(c => c.id);
+}
+function koBuild(pool){
+  const n = pool.participants.length, S = koSize(n), R = Math.log2(S), order = seedOrder(S);
+  pool.matches = [];
+  for (let k = 0; k < S/2; k++){
+    const sa = order[2*k], sb = order[2*k+1];
+    pool.matches.push({ kind:'main', r:0, k, a: sa <= n ? sa-1 : -1, b: sb <= n ? sb-1 : -1, res:null });
+  }
+  for (let r = 1; r < R; r++) for (let k = 0; k < S / 2**(r+1); k++) pool.matches.push({ kind:'main', r, k, a:null, b:null, res:null });
+  pool.current = -1;
+  koRebuild(pool);
+}
+function koRebuild(pool){
+  const n = pool.participants.length, S = koSize(n), R = Math.log2(S);
+  for (let r = 0; r < R; r++){
+    for (let k = 0; k < S / 2**(r+1); k++){
+      const m = mainM(pool, r, k);
+      if (r > 0){
+        const A = winnerOf(mainM(pool, r-1, 2*k)), B = winnerOf(mainM(pool, r-1, 2*k+1));
+        if (m.a !== A || m.b !== B){ m.a = A; m.b = B; m.res = null; }
+      }
+      if (m.a === -1 || m.b === -1){
+        if (m.a === -1 && m.b === -1) m.res = { bye:true, winner:'aka', sa:0, sb:0 };
+        else m.res = { bye:true, winner: m.a === -1 ? 'ao' : 'aka', sa:0, sb:0 };
+      } else if (m.res && m.res.bye) m.res = null;
+    }
+  }
+  // repêchage WKF : les battus des deux finalistes
+  for (const side of [0, 1]){
+    let L = [];
+    if (pool.repechage && R >= 2){
+      const f = winnerOf(mainM(pool, R-2, side));
+      if (f != null){
+        for (let r = 0; r <= R-2; r++){
+          const cnt = S / 2**(r+1);
+          for (let k = 0; k < cnt; k++){
+            if (Math.floor(k / (cnt/2)) !== side) continue;
+            const m = mainM(pool, r, k);
+            if (m.res && !m.res.bye && winnerOf(m) === f) L.push(loserOf(m));
+          }
+        }
+      }
+    }
+    const need = Math.max(0, L.length - 1);
+    let chain = pool.matches.filter(m => m.kind === 'rep' && m.side === side).sort((x,y) => x.step - y.step);
+    if (chain.length !== need){
+      pool.matches = pool.matches.filter(m => !(m.kind === 'rep' && m.side === side));
+      chain = [];
+      for (let j = 0; j < need; j++){ const m = { kind:'rep', side, step:j, a:null, b:null, res:null }; pool.matches.push(m); chain.push(m); }
+    }
+    chain.forEach((m, j) => {
+      const A = j === 0 ? L[0] : winnerOf(chain[j-1]), B = L[j+1];
+      if (m.a !== (A ?? null) || m.b !== B){ m.a = A ?? null; m.b = B; m.res = null; }
+    });
+    pool['repL' + side] = L;
+  }
+}
+function matchLabel(pool, m){
+  if (pool.format !== 'ko') return `Combat ${pool.matches.indexOf(m)+1} / ${pool.matches.length}`;
+  if (m.kind === 'rep') return `Repêchage ${m.side ? 'B' : 'A'} · combat ${m.step+1}`;
+  return roundName(koRounds(pool), m.r);
+}
+function koOrderKey(pool, m){
+  const R = koRounds(pool);
+  if (m.kind === 'rep') return 1000 + m.step * 10 + m.side;
+  if (m.r === R-1) return 9000;
+  return m.r * 100 + m.k;
+}
+function nextUnplayed(pool, from){
+  if (pool.format === 'ko'){
+    let best = -1, bk = Infinity;
+    pool.matches.forEach((m, i) => { if (i !== from && playable(m)){ const k = koOrderKey(pool, m); if (k < bk){ bk = k; best = i; } } });
+    return best;
+  }
+  const n = pool.matches.length;
+  for (let k = 1; k <= n; k++){ const i = (from + k + n) % n; if (!pool.matches[i].res && i !== from) return i; }
+  return -1;
+}
+const poolDone = pool => pool.matches.length > 0 && pool.matches.every(m => m.res);
+const realMatches = pool => pool.matches.filter(m => !isBye(m));
+function koRanking(pool){
+  const n = pool.participants.length, S = koSize(n), R = Math.log2(S);
+  const P = pool.participants.map((p,i) => ({ i, name:p.name, dojo:p.dojo, j:0, w:0, l:0, pf:0, pa:0, rank:null, label:'En lice' }));
+  for (const m of pool.matches){
+    if (!m.res || m.res.bye) continue;
+    const A = P[m.a], B = P[m.b];
+    A.j++; B.j++; A.pf += m.res.sa; A.pa += m.res.sb; B.pf += m.res.sb; B.pa += m.res.sa;
+    P[winnerOf(m)].w++; P[loserOf(m)].l++;
+  }
+  const set = (i, rank, label) => { if (i != null && i >= 0 && P[i].rank == null){ P[i].rank = rank; P[i].label = label; } };
+  const fin = mainM(pool, R-1, 0);
+  if (fin && fin.res){ set(winnerOf(fin), 1, 'Vainqueur'); set(loserOf(fin), 2, 'Finaliste'); }
+  for (const side of [0, 1]){
+    if (pool.repechage && R >= 2){
+      const L = pool['repL' + side] || [];
+      const chain = pool.matches.filter(m => m.kind === 'rep' && m.side === side).sort((x,y) => x.step - y.step);
+      if (L.length === 1) set(L[0], 3, 'Bronze');
+      else if (chain.length && chain[chain.length-1].res){
+        const last = chain[chain.length-1];
+        set(winnerOf(last), 3, 'Bronze'); set(loserOf(last), 5, '5e place');
+      }
+      chain.forEach(m => { if (m.res && m !== chain[chain.length-1]) set(loserOf(m), 7, 'Repêchage'); });
+    } else if (R >= 2){
+      set(loserOf(mainM(pool, R-2, side)), 3, 'Bronze');
+    }
+  }
+  for (let r = 0; r < R; r++){
+    for (const m of pool.matches.filter(x => x.kind === 'main' && x.r === r)){
+      const l = loserOf(m); if (l == null || P[l].rank != null) continue;
+      if (pool.repechage && R >= 2 && r <= R-2){
+        const semisDone = mainM(pool, R-2, 0).res && mainM(pool, R-2, 1).res;
+        const inRep = (pool.repL0 || []).includes(l) || (pool.repL1 || []).includes(l);
+        if (!semisDone || inRep) continue;   // peut encore être repêché / déjà dans le repêchage
+      }
+      let rk = 2 ** (R-1-r) + 1; if (pool.repechage) rk = Math.max(rk, 7);
+      set(l, rk, `Éliminé (${roundName(R, r).toLowerCase()})`);
+    }
+  }
+  P.sort((x,y) => (x.rank ?? 0) - (y.rank ?? 0) || y.w - x.w);
+  const placed = P.filter(p => p.rank != null), raw = placed.map(p => p.rank);
+  placed.forEach((p, k) => p.rank = 1 + raw.filter(v => v < raw[k]).length);
+  return P;
+}
+function bracketHTML(s, pool){
+  const n = pool.participants.length, S = koSize(n), R = Math.log2(S);
+  // grands tableaux (16 et plus) : on n'affiche que les 3 derniers tours (quarts, demies, finale)
+  const start = Math.max(0, R - 3);
+  const firstCnt = S / 2 ** (start + 1);
+  const fs = (firstCnt <= 1 ? 3 : firstCnt <= 2 ? 2.4 : firstCnt <= 4 ? 1.75 : firstCnt <= 8 ? 1.05 : 0.68) * (pool.repechage && S > 2 ? 0.92 : 1);
+  const nm = i => i === -1 ? '<i>exempt</i>' : i == null ? '<i>à déterminer</i>' : esc(pool.participants[i].name);
+  const box = m => {
+    const idx = pool.matches.indexOf(m), w = winnerOf(m), bye = isBye(m);
+    if (bye){ const real = m.a === -1 ? m.b : m.a; return `<div class="bm bye"><div class="br ${m.a === -1 ? 'b' : 'a'} w"><span>${nm(real)}</span><i>exempt</i></div></div>`; }
+    const row = (i, side, sc) => `<div class="br ${side} ${m.res && !bye ? (w === i ? 'w' : 'l') : ''} ${bye && i === -1 ? 'l' : ''}"><span>${nm(i)}</span>${m.res && !bye ? `<b>${sc}</b>` : ''}</div>`;
+    return `<div class="bm ${idx === pool.current ? 'cur' : ''}">${row(m.a, 'a', m.res ? m.res.sa : '')}${row(m.b, 'b', m.res ? m.res.sb : '')}</div>`;
+  };
+  let cols = '';
+  for (let r = start; r < R; r++){
+    const ms = pool.matches.filter(m => m.kind === 'main' && m.r === r).sort((x,y) => x.k - y.k);
+    cols += `<div class="bcol"><div class="bh">${roundName(R, r)}</div><div class="bbody">${ms.map(box).join('')}</div></div>`;
+  }
+  const fin = mainM(pool, R-1, 0);
+  cols += `<div class="bcol win"><div class="bh">Vainqueur</div><div class="bbody"><div class="bwin">${fin && fin.res ? esc(pool.participants[winnerOf(fin)].name) : '?'}</div></div></div>`;
+  let repHTML = '';
+  if (pool.repechage && R >= 2){
+    repHTML = '<div class="brep">' + [0,1].map(side => {
+      const chain = pool.matches.filter(m => m.kind === 'rep' && m.side === side).sort((x,y) => x.step - y.step);
+      const L = pool['repL' + side] || [];
+      const shown = chain.slice(-3);
+      const body = chain.length ? (chain.length > 3 ? '<span class="note">…</span><span class="arr">→</span>' : '') + shown.map(box).join('<span class="arr">→</span>') :
+        (L.length === 1 ? `<span class="note">${esc(pool.participants[L[0]].name)} : bronze direct</span>` : '<span class="note">en attente de la demi-finale</span>');
+      return `<div class="brs"><div class="bh">Repêchage ${side ? 'B' : 'A'}</div><div class="brow">${body}</div></div>`;
+    }).join('') + '</div>';
+  }
+  return `<div class="d-bracket" style="--fs:calc(var(--u)*${fs})"><div class="bmain">${cols}</div>${repHTML}</div>`;
+}
+const formatLabel = p => p.format === 'ko' ? ('Élimination directe' + (p.repechage ? ' + repêchage' : ' sans repêchage')) : 'Poule (chacun contre chacun)';
+function screenHTML(s, scr){
+  const pool = s.pool, ko = pool.format === 'ko';
+  const head = (title) => `<div class="d-sh"><div class="t">${esc(title)}</div><div class="r">${esc(s.tatami||'')} · Kumite ${MODES[s.mode]}</div></div>`;
+  const N = pool.participants.length;
+  if (scr === 'bracket' && !ko) scr = 'list';
+  if (scr === 'list'){
+    const cols = N <= 6 ? 2 : N <= 12 ? 3 : 4;
+    const fs = N <= 4 ? 4.2 : N <= 6 ? 3.4 : N <= 9 ? 2.6 : N <= 12 ? 2.3 : N <= 16 ? 1.9 : 1.6;
+    return head(pool.name || 'Pool') + `<div class="d-sub">${critSummary(pool) ? esc(critSummary(pool)) + ' · ' : ''}${N} compétiteurs · ${ko ? formatLabel(pool) : pool.matches.length + ' combats'}</div>
+      <div class="d-plist" style="--cols:${cols};--fs:calc(var(--u)*${fs})">${pool.participants.map((p,i) =>
+        `<div class="d-pc"><span class="n">${i+1}</span><div><div class="nm">${esc(p.name)}</div><div class="dj">${esc(p.dojo)}</div></div></div>`).join('')}</div>`;
+  }
+  if (scr === 'bracket'){
+    return head(pool.name || 'Tableau') + `<div class="d-sub">${formatLabel(pool)} · ${N} compétiteurs${koRounds(pool) > 3 ? ' · 3 tours affichés' : ''}</div>` + bracketHTML(s, pool);
+  }
+  if (scr === 'callup'){
+    const m = pool.matches[pool.current];
+    if (!m || !playable(m) && !m.res) return screenHTML(s, ko ? 'bracket' : 'list');
+    const A = pool.participants[m.a], B = pool.participants[m.b];
+    const nx = nextUnplayed(pool, pool.current);
+    const nm = nx >= 0 ? pool.matches[nx] : null;
+    return head(pool.name || 'Pool') + `<div class="d-sub">${matchLabel(pool, m)} · Les compétiteurs sont appelés sur le tatami</div>
+      <div class="d-call ${s.swap?'swap':''}">
+        <div class="ca"><div class="tg">AKA</div><div class="nm">${esc(A.name)}</div><div class="dj">${esc(A.dojo)}</div></div>
+        <div class="cb"><div class="tg">AO</div><div class="nm">${esc(B.name)}</div><div class="dj">${esc(B.dojo)}</div></div>
+        <div class="d-vs">VS</div>
+      </div>
+      <div class="d-next">${nm ? `À suivre${ko ? ' (' + matchLabel(pool, nm).toLowerCase() + ')' : ''} : <b>${esc(pool.participants[nm.a].name)}</b> – <b>${esc(pool.participants[nm.b].name)}</b>` : 'Dernier combat du pool'}</div>`;
+  }
+  // ranking
+  const T = poolTable(pool);
+  const done = poolDone(pool);
+  const fs = Math.min(3, 38 / (2.9*N + 1.5)).toFixed(2);
+  if (ko){
+    return head((done ? 'Classement' : 'Classement provisoire') + ' – ' + (pool.name || 'Pool')) +
+      `<div class="d-sub">${formatLabel(pool)}</div>
+      <div class="d-rank" style="--fs:calc(var(--u)*${fs})"><table>
+        <thead><tr><th>Rg</th><th class="l">Compétiteur</th><th class="l">Résultat</th><th>V</th><th>D</th></tr></thead>
+        <tbody>${T.map(p => `<tr class="r${p.rank ?? 0}"><td><span class="rk">${p.rank ?? '–'}</span></td>
+          <td class="l">${esc(p.name)}<small>${esc(p.dojo)}</small></td><td class="l">${esc(p.label)}</td><td>${p.w}</td><td>${p.l}</td></tr>`).join('')}</tbody>
+      </table></div>`;
+  }
+  const pts = pool.ranking === 'points';
+  return head((done ? 'Classement' : 'Classement provisoire') + ' – ' + (pool.name || 'Pool')) +
+    `<div class="d-sub">${pts ? 'Classement aux points marqués' : 'Classement standard (victoires)'}</div>
+    <div class="d-rank" style="--fs:calc(var(--u)*${fs})"><table>
+      <thead><tr><th>Rg</th><th class="l">Compétiteur</th><th>Combats</th><th class="${pts?'':'key'}">V</th><th>D</th><th class="${pts?'key':''}">Pts +</th><th>Pts −</th></tr></thead>
+      <tbody>${T.map(p => `<tr class="r${p.rank}"><td><span class="rk">${p.rank}</span></td>
+        <td class="l">${esc(p.name)}<small>${esc(p.dojo)}</small></td><td>${p.j}</td>
+        <td class="${pts?'':'key'}">${p.w}</td><td>${p.l}</td><td class="${pts?'key':''}">${p.pf}</td><td>${p.pa}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+const BOARD_HTML = `<div class="d-board">
+    <div class="d-top"><span data-d="dTatami"></span><span class="mid" data-d="dCat"></span><span data-d="dModeTop"></span></div>
+    <div class="d-grid" data-d="dGrid">
+      <section class="d-half d-aka" data-d="d-aka"></section>
+      <div class="d-center">
+        <div class="d-mode" data-d="dMode"></div>
+        <div class="d-phase-n" data-d="dPhaseN"></div>
+        <div class="d-clock" data-d="dClock">03:00</div>
+        <div class="d-atoshi" data-d="dAtoshi" hidden>ATOSHI BARAKU</div>
+        <div class="d-phase-t" data-d="dPhaseT"></div>
+      </div>
+      <section class="d-half d-ao" data-d="d-ao"></section>
+    </div>
+  </div>`;
+function createBoard(root){
+  root.innerHTML = BOARD_HTML + '<div class="d-screen" data-d="screen" hidden></div>';
+  const $ = n => root.querySelector(`[data-d="${n}"]`);
+  const halfHTML = side => `
+    <div class="d-head"><div class="d-tag">${side.toUpperCase()}</div><div class="d-senshu" data-k="senshu" hidden>S</div></div>
+    <div class="d-name" data-k="name"></div>
+    <div class="d-dojo" data-k="dojo"></div>
+    <div class="d-score" data-k="score">0</div>
+    <div class="d-counts">
+      <span>Yuko<b data-k="yuko">0</b></span><span>Waza-ari<b data-k="waza">0</b></span><span>Ippon<b data-k="ippon">0</b></span>
+    </div>
+    <div class="d-pens" data-k="pens"></div>
+    <div class="d-win" data-k="win" hidden>VAINQUEUR</div>`;
+  for (const side of ['aka','ao']) $('d-'+side).innerHTML = halfHTML(side);
+  function render(){
+    const s = state;
+    $('dTatami').textContent = s.tatami || '';
+    $('dCat').textContent = s.category || '';
+    $('dModeTop').textContent = 'Kumite ' + MODES[s.mode];
+    $('dGrid').classList.toggle('swap', !!s.swap);
+    for (const side of ['aka','ao']){
+      const f = s[side], el = $('d-'+side);
+      const q = k => el.querySelector(`[data-k="${k}"]`);
+      const n = q('name'); n.textContent = f.name || (side==='aka'?'AKA':'AO');
+      n.classList.toggle('long', (f.name||'').length > 20 && (f.name||'').length <= 30);
+      n.classList.toggle('xlong', (f.name||'').length > 30);
+      q('dojo').textContent = f.dojo || '';
+      q('score').textContent = total(f);
+      q('yuko').textContent = f.yuko; q('waza').textContent = f.waza; q('ippon').textContent = f.ippon;
+      q('senshu').hidden = !(s.mode === 'wkf' && f.senshu);
+      const cats = s.mode === 'wkf' ? [['', f.p1]] : [['Cat. 1', f.p1], ['Cat. 2', f.p2]];
+      q('pens').innerHTML = cats.map(([lbl, lv]) =>
+        `<div class="d-penrow">${lbl ? `<span class="d-pl">${lbl}</span>` : ''}${PEN.map((p,i) =>
+          `<span class="d-pill ${i < lv ? 'on' : ''} ${i===3?'hc':''} ${i===4?'h':''}">${p}</span>`).join('')}</div>`).join('');
+      q('win').hidden = s.winner !== side;
+      el.classList.toggle('lost', !!s.winner && s.winner !== side);
+    }
+    $('dMode').textContent = MODES[s.mode];
+    const ph = PHASES[s.mode];
+    if (ph){
+      const [who, what, counter] = ph[s.phase] || ph[0];
+      $('dPhaseN').textContent = (s.mode === 'k4x15' ? 'Assaut ' : 'Échange ') + (s.phase+1) + ' / ' + ph.length;
+      $('dPhaseT').innerHTML = `<span class="${who==='AKA'?'a':'b'}">${who}</span> ${what}` +
+        (counter ? `<br><span class="${counter.startsWith('AKA')?'a':'b'}">${counter.split(' ')[0]}</span> ${counter.split(' ').slice(1).join(' ')}` : '');
+      $('dPhaseN').hidden = false; $('dPhaseT').hidden = false;
+    } else { $('dPhaseN').hidden = true; $('dPhaseT').hidden = true; }
+    $('dClock').hidden = !timerOn();
+    const scr = s.pool ? (s.screen || 'score') : 'score';
+    const se = $('screen');
+    se.hidden = scr === 'score';
+    if (scr !== 'score') se.innerHTML = screenHTML(s, scr);
+    renderClock();
+  }
+  function renderClock(){
+    if (!timerOn()) { $('dAtoshi').hidden = true; return; }
+    const rem = remainingNow(), A = atoshiMs();
+    const c = $('dClock');
+    c.textContent = fmt(rem);
+    const ended = rem <= 0, warn = !ended && A > 0 && rem <= A;
+    c.className = 'd-clock' + (ended ? ' ended' : warn ? ' warn' : (!state.timer.running ? ' paused' : ''));
+    $('dAtoshi').hidden = !(warn && state.mode === 'wkf');
+  }
+  return { render, renderClock };
+}
+
+function initDisplay(){
+  document.body.classList.add('is-display');
+  document.getElementById('display').hidden = false;
+  const board = createBoard(document.getElementById('displayRoot'));
+  const hint = document.getElementById('dHint');
+  hint.addEventListener('click', () => { goFull(); audio(); hint.style.opacity = 0; setTimeout(()=>hint.remove(), 600); });
+  document.addEventListener('dblclick', () => { if (document.fullscreenElement) document.exitFullscreen(); else goFull(); });
+  function goFull(){ const el = document.documentElement; if (el.requestFullscreen) el.requestFullscreen().catch(()=>{}); }
+  function onMsg(m){
+    if (!m) return;
+    if (m.type === 'state'){ state = m.state; board.render(); }
+    if (m.type === 'sound') playLocal(m.kind);
+  }
+  if (chan) chan.onmessage = e => onMsg(e.data);
+  window.addEventListener('storage', e => { if (e.key === KEY && e.newValue) { try { state = JSON.parse(e.newValue); board.render(); } catch(_){} } });
+  (function loop(){ board.renderClock(); requestAnimationFrame(loop); })();
+  board.render();
+  broadcast({ type:'hello' });
+}
+
+/* =====================================================================
+   CONTROL
+   ===================================================================== */
+function initControl(){
+  document.getElementById('control').hidden = false;
+  const $ = id => document.getElementById(id);
+  let competitors = load(KEY_COMP, []);
+  const KEY_POOLS = 'kumiteScore.pools.v1';
+  let pools = load(KEY_POOLS, []);
+  if (state.pool){
+    if (!state.pool.id) Object.assign(state.pool, { id:uid(), type:'manual', mode:state.mode, criteria:{}, memberIds:state.pool.participants.map(p => p.id) });
+    const i = pools.findIndex(p => p.id === state.pool.id);
+    if (i >= 0) pools[i] = state.pool; else pools.push(state.pool);
+  }
+  let history = [];
+  let alertMsg = '';
+  const preview = createBoard($('previewRoot'));
+
+  function commit(){
+    save(KEY, state);
+    save(KEY_POOLS, pools);
+    broadcast({ type:'state', state });
+    render();
+  }
+  function snapshot(){
+    history.push(JSON.stringify({ aka:state.aka, ao:state.ao, winner:state.winner }));
+    if (history.length > 100) history.shift();
+  }
+  function undo(){
+    const h = history.pop(); if (!h) return;
+    Object.assign(state, JSON.parse(h)); commit();
+  }
+  function playSound(kind){
+    const out = state.settings.sound.out;
+    if (out === 'control' || out === 'both') playLocal(kind);
+    if (out === 'display' || out === 'both') broadcast({ type:'sound', kind });
+  }
+
+  /* --- fighter cards --- */
+  const cardHTML = side => `
+    <div class="fhead"><span class="tag">${side.toUpperCase()}</span><span class="ftotal" data-k="total">0</span></div>
+    <div class="ffields">
+      <label>Nom<input data-in="name" list="compNames" autocomplete="off"></label>
+      <label>Dojo<input data-in="dojo" autocomplete="off"></label>
+    </div>
+    ${[['yuko','Yuko',1],['waza','Waza-ari',2],['ippon','Ippon',3]].map(([k,l,p]) => `
+      <div class="srow"><span class="lbl">${l}</span><span class="val" data-k="${k}">0</span>
+        <button class="minus" data-score="${k}" data-d="-1" title="Retirer">−</button>
+        <button class="plus" data-score="${k}" data-d="1">+ ${l}<small>(${p} pt${p>1?'s':''})</small></button></div>`).join('')}
+    <div class="pensec" data-k="pens"></div>
+    <div class="factions">
+      <button class="btn" data-act="senshu">Senshu</button>
+      <button class="btn" data-act="kachi">Déclarer vainqueur</button>
+    </div>`;
+  for (const side of ['aka','ao']){
+    const el = $('f-'+side);
+    el.innerHTML = cardHTML(side);
+    el.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.score) addScore(side, b.dataset.score, +b.dataset.d);
+      else if (b.dataset.pen) setPen(side, b.dataset.pen, +b.dataset.lv);
+      else if (b.dataset.act === 'senshu') { snapshot(); const v = !state[side].senshu; state.aka.senshu = state.ao.senshu = false; state[side].senshu = v; commit(); }
+      else if (b.dataset.act === 'kachi') { snapshot(); state.winner = state.winner === side ? null : side; if (state.winner && state.timer.running) stopTimer(); commit(); }
+    });
+    el.querySelectorAll('[data-in]').forEach(inp => inp.addEventListener('input', () => {
+      state[side][inp.dataset.in] = inp.value;
+      if (inp.dataset.in === 'name'){
+        const c = competitors.find(c => c.name === inp.value);
+        if (c){ state[side].dojo = c.dojo; if (c.category && !state.category) state.category = c.category; }
+      }
+      commit();
+    }));
+  }
+
+  function addScore(side, kind, d){
+    const f = state[side], o = state[side==='aka'?'ao':'aka'];
+    if (d < 0 && f[kind] === 0) return;
+    snapshot();
+    const wasZero = total(f) === 0 && total(o) === 0;
+    f[kind] = Math.max(0, f[kind] + d);
+    if (state.mode === 'wkf'){
+      if (d > 0 && wasZero && state.settings.wkf.autoSenshu && !f.senshu && !o.senshu) f.senshu = true;
+      if (d < 0 && total(f) === 0 && f.senshu && state.settings.wkf.autoSenshu) f.senshu = false;
+      const gap = state.settings.wkf.gap;
+      if (gap > 0 && d > 0 && total(f) - total(o) >= gap){
+        if (state.timer.running) stopTimer();
+        alertMsg = `Écart de ${gap} points atteint – ${side.toUpperCase()} gagne le combat.`;
+      }
+    }
+    commit();
+  }
+  function setPen(side, cat, lv){
+    snapshot();
+    const k = 'p'+cat;
+    state[side][k] = state[side][k] === lv ? lv - 1 : lv;
+    if (state[side][k] === 5) alertMsg = `Hansoku pour ${side.toUpperCase()} – victoire de ${side==='aka'?'AO':'AKA'} à déclarer.`;
+    commit();
+  }
+
+  /* --- timer --- */
+  let lastRem = null;
+  function startTimer(){
+    if (!timerOn() || state.timer.remaining <= 0) return;
+    audio();
+    if (state.screen !== 'score') state.screen = 'score';
+    state.timer.endAt = Date.now() + state.timer.remaining;
+    state.timer.running = true; lastRem = state.timer.remaining;
+    commit();
+  }
+  function stopTimer(){
+    state.timer.remaining = remainingNow();
+    state.timer.running = false;
+    commit();
+  }
+  function toggleTimer(){ state.timer.running ? stopTimer() : startTimer(); }
+  function resetTimer(){
+    state.timer = { running:false, remaining:totalMs(), endAt:0 }; lastRem = null; commit();
+  }
+  function adjust(ms){
+    const max = Math.max(totalMs(), 60*60*1000);
+    if (state.timer.running){
+      const r = Math.min(max, Math.max(0, remainingNow() + ms));
+      state.timer.endAt = Date.now() + r;
+    } else state.timer.remaining = Math.min(max, Math.max(0, state.timer.remaining + ms));
+    commit();
+  }
+  function tick(){
+    const rem = remainingNow();
+    if (state.timer.running){
+      const A = atoshiMs();
+      if (A > 0 && lastRem !== null && lastRem > A && rem <= A && rem > 0) playSound('atoshi');
+      if (rem <= 0){
+        state.timer.running = false; state.timer.remaining = 0;
+        if (state.mode === 'k4x15' && state.phase < 3) alertMsg = `Fin de l'assaut ${state.phase+1} – Hantei, puis « Phase suivante ».`;
+        else if (state.mode === 'k4x15') alertMsg = 'Fin des 4 assauts – Hantei final.';
+        commit(); playSound('end');
+      }
+    }
+    lastRem = rem;
+    renderClock();
+    preview.renderClock();
+  }
+  setInterval(tick, 50);
+
+  function setPhase(p){
+    const ph = PHASES[state.mode]; if (!ph) return;
+    state.phase = Math.min(ph.length-1, Math.max(0, p));
+    alertMsg = '';
+    state.timer = { running:false, remaining:totalMs(), endAt:0 }; lastRem = null;
+    commit();
+  }
+
+  /* --- render --- */
+  function renderClock(){
+    const c = $('cClock');
+    if (!timerOn()){ c.textContent = 'Pas de chronomètre'; c.className = 'bigclock off'; return; }
+    const rem = remainingNow(), A = atoshiMs();
+    c.textContent = fmt(rem);
+    c.className = 'bigclock' + (rem <= 0 ? ' ended' : (A > 0 && rem <= A) ? ' warn' : (!state.timer.running ? ' paused' : ''));
+    const ss = $('startStop');
+    ss.textContent = state.timer.running ? '❚❚ Arrêter (Yame)' : '▶ ' + (rem < totalMs() && rem > 0 ? 'Reprendre' : 'Démarrer');
+    ss.classList.toggle('running', state.timer.running);
+  }
+  function render(){
+    const s = state;
+    $('mode').value = s.mode;
+    if (document.activeElement !== $('tatami')) $('tatami').value = s.tatami;
+    if (document.activeElement !== $('category')) $('category').value = s.category;
+    for (const side of ['aka','ao']){
+      const el = $('f-'+side), f = s[side];
+      const q = k => el.querySelector(`[data-k="${k}"]`);
+      q('total').textContent = total(f);
+      ['yuko','waza','ippon'].forEach(k => q(k).textContent = f[k]);
+      el.querySelectorAll('[data-in]').forEach(inp => { if (document.activeElement !== inp) inp.value = f[inp.dataset.in] || ''; });
+      const cats = s.mode === 'wkf' ? [[1,'Pénalités']] : [[1,'Cat. 1'],[2,'Cat. 2']];
+      q('pens').innerHTML = cats.map(([c,l]) => `<div class="penrow"><span class="pl">${l}</span>` +
+        PEN.map((p,i) => `<button class="penbtn ${f['p'+c] > i ? 'on' : ''} ${i===3?'hc':''} ${i===4?'h':''}" data-pen="${c}" data-lv="${i+1}">${p}</button>`).join('') + '</div>').join('');
+      const sb = el.querySelector('[data-act="senshu"]');
+      sb.hidden = s.mode !== 'wkf';
+      sb.classList.toggle('toggled', f.senshu);
+      const kb = el.querySelector('[data-act="kachi"]');
+      kb.classList.toggle('win', s.winner === side);
+      kb.textContent = s.winner === side ? '✓ Vainqueur' : 'Déclarer vainqueur';
+    }
+    const ph = PHASES[s.mode];
+    $('phaseCtl').hidden = !ph;
+    if (ph){
+      const [who, what, counter] = ph[s.phase];
+      $('cPhase').textContent = (s.mode==='k4x15'?'Assaut ':'Échange ') + (s.phase+1) + '/' + ph.length + ' · ' + who + ' ' + what + (counter ? ' – ' + counter : '');
+      $('prevPhase').disabled = s.phase === 0;
+      $('nextPhase').disabled = s.phase >= ph.length-1;
+    } else $('cPhase').textContent = 'Kumite WKF · ' + fmt(totalMs());
+    preview.render();
+    renderPool();
+    document.querySelectorAll('.tctl').forEach(el => el.hidden = !timerOn());
+    $('cAlert').hidden = !alertMsg; $('cAlert').textContent = alertMsg;
+    $('undo').disabled = !history.length;
+    // settings inputs
+    document.querySelectorAll('[data-set]').forEach(inp => {
+      if (document.activeElement === inp) return;
+      const [a,b] = inp.dataset.set.split('.'); const v = s.settings[a][b];
+      if (inp.type === 'checkbox') inp.checked = !!v; else inp.value = v;
+    });
+    renderClock();
+  }
+
+  /* --- top bar & timer buttons --- */
+  $('mode').addEventListener('change', e => {
+    state.mode = e.target.value; state.phase = 0; alertMsg = '';
+    if (state.pool) state.pool.mode = state.mode;
+    state.timer = { running:false, remaining:totalMs(), endAt:0 };
+    commit();
+  });
+  $('tatami').addEventListener('input', e => { state.tatami = e.target.value; commit(); });
+  $('category').addEventListener('input', e => { state.category = e.target.value; commit(); });
+  $('openDisplay').addEventListener('click', () => {
+    const w = window.open(BASE + '#display', 'kumiteDisplay', 'popup,width=1280,height=720');
+    if (!w) alert("La fenêtre a été bloquée. Autorisez les fenêtres pop-up, ou ouvrez cette même page avec #display à la fin de l'adresse.");
+    setTimeout(() => broadcast({ type:'state', state }), 800);
+  });
+  $('startStop').addEventListener('click', toggleTimer);
+  document.querySelectorAll('[data-adj]').forEach(b => b.addEventListener('click', () => adjust(+b.dataset.adj)));
+  $('resetTimer').addEventListener('click', () => { alertMsg=''; resetTimer(); });
+  $('applyTime').addEventListener('click', () => {
+    const v = $('setTime').value.trim(); if (!v) return;
+    const m = v.match(/^(\d+)(?::(\d{1,2}))?$/); if (!m) { alert('Format attendu : m:ss (ex. 1:30) ou secondes (ex. 90)'); return; }
+    const ms = (m[2] !== undefined ? (+m[1]*60 + +m[2]) : +m[1]) * 1000;
+    state.timer = { running:false, remaining:ms, endAt:0 }; lastRem = null; $('setTime').value=''; commit();
+  });
+  $('prevPhase').addEventListener('click', () => setPhase(state.phase-1));
+  $('nextPhase').addEventListener('click', () => setPhase(state.phase+1));
+  $('undo').addEventListener('click', undo);
+  $('swapSides').addEventListener('click', () => { state.swap = !state.swap; commit(); });
+  $('newMatch').addEventListener('click', () => {
+    if (!confirm('Démarrer un nouveau combat ? Scores, pénalités, noms et chrono seront remis à zéro.')) return;
+    state.aka = fighter(); state.ao = fighter(); state.winner = null; state.phase = 0; alertMsg=''; history = [];
+    state.timer = { running:false, remaining:totalMs(), endAt:0 };
+    commit();
+  });
+
+  /* --- keyboard --- */
+  document.addEventListener('keydown', e => {
+    const t = e.target;
+    if (t.matches('input,select,textarea')) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){ e.preventDefault(); undo(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key.toLowerCase(), d = e.shiftKey ? -1 : 1;
+    const map = { a:['aka','yuko'], s:['aka','waza'], d:['aka','ippon'], j:['ao','yuko'], k:['ao','waza'], l:['ao','ippon'] };
+    if (e.code === 'Space'){ e.preventDefault(); toggleTimer(); }
+    else if (map[k]) { e.preventDefault(); addScore(map[k][0], map[k][1], d); }
+    else if (k === 'n') setPhase(state.phase+1);
+  });
+
+  /* --- tabs --- */
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x===b));
+    document.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== b.dataset.tab);
+    if (b.dataset.tab === 'preview') preview.render();
+  }));
+
+  /* --- settings --- */
+  document.querySelectorAll('[data-set]').forEach(inp => inp.addEventListener('change', () => {
+    const [a,b] = inp.dataset.set.split('.');
+    let v = inp.type === 'checkbox' ? inp.checked : (inp.type === 'number' || inp.type === 'range') ? Math.max(0, +inp.value || 0) : inp.value;
+    if (b === 'duration') v = Math.max(5, v);
+    state.settings[a][b] = v;
+    if ((b === 'duration' || b === 'useTimer') && a === state.mode && !state.timer.running) state.timer = { running:false, remaining:totalMs(), endAt:0 };
+    commit();
+  }));
+  $('testAtoshi').addEventListener('click', () => playSound('atoshi'));
+  $('testEnd').addEventListener('click', () => playSound('end'));
+  $('factoryReset').addEventListener('click', () => {
+    if (!confirm('Remettre tous les réglages par défaut ?')) return;
+    state.settings = clone(DEFAULT_SETTINGS);
+    if (!state.timer.running) state.timer = { running:false, remaining:totalMs(), endAt:0 };
+    commit();
+  });
+
+  /* --- pools --- */
+  let editing = null, editingId = null;
+  const selected = new Set();
+  const numOrNull = v => (v === '' || v == null || isNaN(+v)) ? null : +v;
+  const inPool = (c, p) => p.type === 'manual' ? (p.memberIds || []).includes(c.id) : matchesCrit(c, p.criteria || {});
+  const poolMembers = p => competitors.filter(c => inPool(c, p));
+  const hasResults = p => p.matches.some(m => m.res && !m.res.bye);
+  function refreshPool(p){
+    if (!p.format) p.format = 'rr';
+    if (hasResults(p) || (p === state.pool && p.current >= 0)) return;
+    let mem = poolMembers(p);
+    if (p.format === 'ko'){
+      const ids = new Set(mem.map(c => c.id));
+      if (!p.draw || p.draw.length !== mem.length || !p.draw.every(id => ids.has(id))) p.draw = mem.length ? makeDraw(mem) : [];
+      mem = p.draw.map(id => mem.find(c => c.id === id));
+    }
+    const sig = [p.format, p.format === 'ko' && p.repechage ? 1 : 0, ...mem.map(c => c.id)].join('|');
+    p.participants = mem.map(c => ({ id:c.id, name:c.name, dojo:c.dojo }));
+    if (sig !== p.sig || !p.matches.length && mem.length >= 2){
+      p.sig = sig; p.current = -1;
+      if (mem.length < 2) p.matches = [];
+      else if (p.format === 'ko') koBuild(p);
+      else p.matches = roundRobin(mem.length).map(([a,b]) => ({ a, b, res:null }));
+    }
+  }
+  function poolStatus(p){
+    if (poolDone(p) && realMatches(p).length) return 'done';
+    if (hasResults(p) || (state.pool === p && p.current >= 0)) return 'live';
+    return 'ready';
+  }
+  function canReplay(pool, i){
+    const m = pool.matches[i];
+    if (pool.format !== 'ko' || !m.res) return true;
+    const key = koOrderKey(pool, m), pl = [m.a, m.b];
+    return !pool.matches.some((x, j) => j !== i && x.res && !x.res.bye && koOrderKey(pool, x) > key && (pl.includes(x.a) || pl.includes(x.b)));
+  }
+  function nextPool(){
+    const i = pools.indexOf(state.pool);
+    const order = i >= 0 ? pools.slice(i+1).concat(pools.slice(0, i)) : pools;
+    return order.find(p => { refreshPool(p); return poolStatus(p) !== 'done' && p.participants.length >= 2; });
+  }
+  function activatePool(p){
+    if (state.pool && state.pool !== p && state.pool.current >= 0 && (total(state.aka) || total(state.ao) || state.timer.running)
+        && !confirm('Un combat est en cours sur le pool actuel. Le quitter sans enregistrer ?')) return;
+    if (state.pool && state.pool !== p) state.pool.current = -1;
+    refreshPool(p);
+    if (p.participants.length < 2){ alert('Ce pool contient moins de 2 compétiteurs.'); return; }
+    state.pool = p; state.mode = p.mode; state.category = p.name; state.screen = p.format === 'ko' ? 'bracket' : 'list'; state.phase = 0;
+    state.aka = fighter(); state.ao = fighter(); state.winner = null; history = []; alertMsg = '';
+    state.timer = { running:false, remaining:totalMs(), endAt:0 }; lastRem = null;
+    commit();
+  }
+  function renderPools(){
+    pools.forEach(refreshPool);
+    const st = { ready:['', 'Prêt'], live:['now', 'En cours'], done:['done', 'Terminé'] };
+    $('poolCards').innerHTML = pools.length ? pools.map(p => {
+      const N = p.participants.length, M = realMatches(p).length, done = realMatches(p).filter(m => m.res).length;
+      const [cls, lbl] = st[poolStatus(p)];
+      const active = state.pool === p;
+      return `<div class="pcard ${active ? 'active' : ''} ${editingId === p.id ? 'editing' : ''}">
+        <div class="pc-top"><b>${esc(p.name)}</b><span class="badge ${p.type}">${p.type === 'auto' ? 'Auto' : 'Manuel'}</span></div>
+        <div class="pc-meta">${MODES[p.mode]} · ${N} compétiteur${N>1?'s':''} · ${p.format === 'ko' ? (p.repechage ? 'Tableau + repêchage' : 'Tableau') : `Poule, ${M} combat${M>1?'s':''}`}</div>
+        <div class="pc-crit">${esc(critSummary(p))}</div>
+        <div><span class="st ${cls}">${lbl}${poolStatus(p) === 'live' ? ` ${done}/${M}` : ''}</span>${N < 2 ? ' <span class="st" style="background:#fee2e2;color:#991b1b">moins de 2 compétiteurs</span>' : ''}</div>
+        <div class="pc-acts">
+          ${active ? '<span class="st now">Sur le tatami</span>' : `<button class="btn sm dark" data-pact="activate" data-pid="${p.id}" ${N < 2 ? 'disabled' : ''}>▶ Sur le tatami</button>`}
+          <button class="btn sm" data-pact="edit" data-pid="${p.id}">Modifier</button>
+          <button class="btn sm" data-pact="dup" data-pid="${p.id}">Dupliquer</button>
+          ${p.format === 'ko' && !hasResults(p) && N >= 2 ? `<button class="btn sm" data-pact="draw" data-pid="${p.id}" title="Nouveau tirage au sort du tableau">Tirage</button>` : ''}
+          <button class="btn sm danger" data-pact="del" data-pid="${p.id}" title="Supprimer">✕</button>
+        </div></div>`;
+    }).join('') : '<div class="empty" style="grid-column:1/-1">Aucun pool. Créez vos pools à l\'avance avec « + Nouveau pool ».</div>';
+    let warn = '';
+    if (pools.length && competitors.length){
+      const cnt = new Map();
+      pools.forEach(p => poolMembers(p).forEach(c => cnt.set(c.id, (cnt.get(c.id) || 0) + 1)));
+      const none = competitors.filter(c => !cnt.get(c.id)), multi = competitors.filter(c => cnt.get(c.id) > 1);
+      const names = l => l.slice(0, 12).map(c => esc(c.name)).join(', ') + (l.length > 12 ? ` … (+${l.length-12})` : '');
+      if (none.length) warn += `<div class="pwarn"><b>${none.length} compétiteur${none.length>1?'s':''} sans pool :</b> ${names(none)}</div>`;
+      if (multi.length) warn += `<div class="pwarn"><b>${multi.length} compétiteur${multi.length>1?'s':''} dans plusieurs pools :</b> ${names(multi)}</div>`;
+    }
+    $('poolWarn').innerHTML = warn;
+  }
+  $('poolCards').addEventListener('click', e => {
+    const b = e.target.closest('[data-pact]'); if (!b) return;
+    const p = pools.find(x => x.id === b.dataset.pid); if (!p) return;
+    const act = b.dataset.pact;
+    if (act === 'activate') activatePool(p);
+    else if (act === 'draw'){
+      if (state.pool === p && p.current >= 0) return;
+      p.draw = makeDraw(poolMembers(p)); p.sig = null; refreshPool(p); commit();
+    }
+    else if (act === 'edit') openEditor(p);
+    else if (act === 'dup'){
+      const c = Object.assign(clone(p), { id:uid(), name:p.name + ' (copie)', participants:[], matches:[], current:-1, sig:null, draw:null });
+      if (c.type === 'manual') c.memberIds = p.memberIds.slice();
+      pools.splice(pools.indexOf(p) + 1, 0, c); refreshPool(c); commit(); openEditor(c);
+    } else if (act === 'del'){
+      if (!confirm(`Supprimer le pool « ${p.name} »${hasResults(p) ? ' et ses résultats' : ''} ?`)) return;
+      if (state.pool === p){ state.pool = null; state.screen = 'score'; }
+      if (editingId === p.id) closeEditor();
+      pools.splice(pools.indexOf(p), 1); commit();
+    }
+  });
+
+  /* editor */
+  $('eGMin').innerHTML = gradeOptions('—'); $('eGMax').innerHTML = gradeOptions('—');
+  function openEditor(p){
+    editingId = p ? p.id : null;
+    editing = p ? clone(p) : { name:'', type:'auto', mode:state.mode, ranking:'standard', format:'rr', repechage:true,
+      criteria:{ sex:'', ageMin:null, ageMax:null, wMin:null, wMax:null, gMin:null, gMax:null }, memberIds:[] };
+    editing.criteria = Object.assign({ sex:'', ageMin:null, ageMax:null, wMin:null, wMax:null, gMin:null, gMax:null }, editing.criteria || {});
+    selected.clear(); (editing.memberIds || []).forEach(id => selected.add(id));
+    $('eTitle').textContent = p ? `Modifier « ${p.name} »` : 'Nouveau pool';
+    $('eName').value = editing.name; $('eType').value = editing.type; $('eMode').value = editing.mode; $('eRank').value = editing.ranking;
+    $('eFormat').value = editing.format || 'rr'; $('eRep').checked = editing.repechage !== false;
+    const k = editing.criteria, v = x => x == null ? '' : x;
+    $('eSex').value = k.sex || ''; $('eAgeMin').value = v(k.ageMin); $('eAgeMax').value = v(k.ageMax);
+    $('eWMin').value = v(k.wMin); $('eWMax').value = v(k.wMax); $('eGMin').value = v(k.gMin); $('eGMax').value = v(k.gMax);
+    const locked = !!(p && hasResults(p));
+    $('eLocked').hidden = !locked;
+    ['eType','eFormat','eRep','eSex','eAgeMin','eAgeMax','eWMin','eWMax','eGMin','eGMax'].forEach(id => $(id).disabled = locked);
+    $('poolEditor').hidden = false;
+    renderEditor(); renderPools();
+    $('poolEditor').scrollIntoView({ behavior:'smooth', block:'nearest' });
+    $('eName').focus();
+  }
+  function closeEditor(){ editing = null; editingId = null; $('poolEditor').hidden = true; renderPools(); }
+  function readEditor(){
+    if (!editing) return;
+    editing.name = $('eName').value.trim(); editing.type = $('eType').value; editing.mode = $('eMode').value; editing.ranking = $('eRank').value;
+    editing.format = $('eFormat').value; editing.repechage = $('eRep').checked;
+    editing.criteria = { sex:$('eSex').value, ageMin:numOrNull($('eAgeMin').value), ageMax:numOrNull($('eAgeMax').value),
+      wMin:numOrNull($('eWMin').value), wMax:numOrNull($('eWMax').value), gMin:numOrNull($('eGMin').value), gMax:numOrNull($('eGMax').value) };
+    editing.memberIds = competitors.filter(c => selected.has(c.id)).map(c => c.id);
+  }
+  function renderEditor(){
+    if (!editing) return;
+    $('eAuto').hidden = editing.type !== 'auto'; $('eManual').hidden = editing.type !== 'manual';
+    $('eRepWrap').hidden = editing.format !== 'ko'; $('eRankWrap').hidden = editing.format === 'ko';
+    if (editing.type === 'manual'){
+      const cats = [...new Set(competitors.map(c => c.category).filter(Boolean))].sort();
+      const cur = $('eCat').value;
+      $('eCat').innerHTML = '<option value="">Toutes</option>' + cats.map(c => `<option ${c===cur?'selected':''}>${esc(c)}</option>`).join('');
+      const q = $('eSearch').value.trim().toLowerCase();
+      const list = competitors.filter(c => (!$('eCat').value || c.category === $('eCat').value) && (!q || compText(c).includes(q)));
+      $('eChecks').innerHTML = list.length ? list.map(c => `<label><input type="checkbox" data-cid="${c.id}" ${selected.has(c.id)?'checked':''}>
+        <span>${esc(c.name)}<small>${esc(compInfo(c))}</small></span></label>`).join('')
+        : '<div class="empty">Aucun compétiteur. Ajoutez-les dans l\'onglet « Compétiteurs ».</div>';
+    }
+    const target = editingId ? pools.find(p => p.id === editingId) : null;
+    const mem = target && hasResults(target) ? target.participants : poolMembers(editing);
+    const n = mem.length;
+    const noCrit = editing.type === 'auto' && !Object.values(editing.criteria).some(x => x !== '' && x != null);
+    const nCombats = editing.format === 'ko' ? `tableau de ${n < 2 ? 0 : koSize(n)}${n >= 2 && koSize(n) > n ? ` (${koSize(n)-n} exempt${koSize(n)-n>1?'s':''})` : ''}` : `${n*(n-1)/2} combats`;
+    $('eCount').textContent = `${n} compétiteur${n>1?'s':''} · ${nCombats}` + (noCrit ? ' – aucun critère : tous les compétiteurs sont inclus' : '');
+    $('ePreview').innerHTML = mem.map(c => {
+      const full = competitors.find(x => x.id === c.id) || c;
+      return `<span class="chip">${esc(c.name)} <small>${esc(compInfo(full, true))}</small></span>`;
+    }).join('');
+  }
+  $('poolEditor').addEventListener('input', e => { if (e.target.dataset.cid || e.target.id === 'eSearch') return; readEditor(); renderEditor(); });
+  $('poolEditor').addEventListener('change', e => {
+    if (e.target.dataset.cid){ e.target.checked ? selected.add(e.target.dataset.cid) : selected.delete(e.target.dataset.cid); }
+    readEditor(); renderEditor();
+  });
+  $('eSearch').addEventListener('input', renderEditor);
+  $('eAll').addEventListener('click', () => { $('eChecks').querySelectorAll('[data-cid]').forEach(i => selected.add(i.dataset.cid)); readEditor(); renderEditor(); });
+  $('eNone').addEventListener('click', () => { selected.clear(); readEditor(); renderEditor(); });
+  $('pNew').addEventListener('click', () => openEditor(null));
+  $('eCancel').addEventListener('click', closeEditor);
+  $('eSave').addEventListener('click', () => {
+    readEditor();
+    const name = editing.name || critSummary(editing) || ($('eCat').value || 'Pool ' + (pools.length + 1));
+    let p = editingId ? pools.find(x => x.id === editingId) : null;
+    if (p){
+      Object.assign(p, { name, mode:editing.mode, ranking:editing.ranking });
+      if (!hasResults(p)) Object.assign(p, { type:editing.type, criteria:editing.criteria, memberIds:editing.memberIds, format:editing.format, repechage:editing.repechage });
+      if (state.pool === p){ state.category = p.name; if (!state.timer.running && state.mode !== p.mode){ state.mode = p.mode; state.timer = { running:false, remaining:totalMs(), endAt:0 }; } }
+    } else {
+      p = { id:uid(), name, type:editing.type, mode:editing.mode, ranking:editing.ranking, criteria:editing.criteria, format:editing.format, repechage:editing.repechage,
+        memberIds:editing.memberIds, participants:[], matches:[], current:-1 };
+      pools.push(p);
+    }
+    refreshPool(p);
+    editing = null; editingId = null; $('poolEditor').hidden = true;
+    commit();
+  });
+
+  /* flow on the tatami */
+  function loadMatch(i){
+    const pool = state.pool, m = pool.matches[i]; if (!m || m.a == null || m.b == null || m.a < 0 || m.b < 0) return;
+    pool.current = i;
+    const A = pool.participants[m.a], B = pool.participants[m.b];
+    state.aka = Object.assign(fighter(), { name:A.name, dojo:A.dojo });
+    state.ao  = Object.assign(fighter(), { name:B.name, dojo:B.dojo });
+    state.winner = null; state.phase = 0; history = []; alertMsg = '';
+    state.timer = { running:false, remaining:totalMs(), endAt:0 }; lastRem = null;
+    state.screen = 'callup';
+    commit();
+  }
+  function finishMatch(){
+    const pool = state.pool; if (!pool || pool.current < 0) return;
+    if (!state.winner){ alertMsg = 'Déclarez le vainqueur (bouton « Déclarer vainqueur ») avant de terminer le combat.'; render(); return; }
+    if (state.timer.running){ state.timer.remaining = remainingNow(); state.timer.running = false; }
+    const cur = pool.matches[pool.current];
+    cur.res = { winner:state.winner, sa:total(state.aka), sb:total(state.ao), aka:clone(state.aka), ao:clone(state.ao), mode:state.mode };
+    if (pool.format === 'ko') koRebuild(pool);
+    pool.current = pool.matches.indexOf(cur);
+    const nx = nextUnplayed(pool, pool.current);
+    if (nx >= 0) loadMatch(nx);
+    else {
+      pool.current = -1; state.screen = 'ranking';
+      state.aka = fighter(); state.ao = fighter(); state.winner = null; history = []; alertMsg = '';
+      state.timer = { running:false, remaining:totalMs(), endAt:0 };
+      commit();
+    }
+  }
+  $('flStart').addEventListener('click', () => {
+    const pool = state.pool; if (!pool) return;
+    const i = nextUnplayed(pool, -1);
+    if (i >= 0) loadMatch(i);
+  });
+  $('flHajime').addEventListener('click', () => { state.screen = 'score'; commit(); });
+  $('flFinish').addEventListener('click', finishMatch);
+  $('flNextPool').addEventListener('click', () => { const p = nextPool(); if (p) activatePool(p); });
+  document.querySelectorAll('[data-screen]').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.screen === 'callup' && (!state.pool || state.pool.current < 0)) return;
+    state.screen = b.dataset.screen; commit();
+  }));
+  $('pUnload').addEventListener('click', () => {
+    const pool = state.pool; if (!pool) return;
+    if (pool.current >= 0 && (total(state.aka) || total(state.ao) || state.timer.running) && !confirm('Un combat est en cours. Le quitter sans enregistrer ?')) return;
+    pool.current = -1; state.pool = null; state.screen = 'score';
+    state.aka = fighter(); state.ao = fighter(); state.winner = null; history = [];
+    commit();
+  });
+  $('pvRank').addEventListener('change', e => { state.pool.ranking = e.target.value; commit(); });
+  $('pvMatches').addEventListener('click', e => {
+    const b = e.target.closest('[data-load]'); if (!b) return;
+    const i = +b.dataset.load, pool = state.pool;
+    if (!canReplay(pool, i)){ alert('Ce combat ne peut plus être rejoué : un des compétiteurs a déjà disputé un combat suivant.'); return; }
+    if (pool.current >= 0 && pool.current !== i && (total(state.aka) || total(state.ao) || state.timer.running)
+        && !confirm('Le combat en cours n\'est pas terminé. Le quitter sans enregistrer ?')) return;
+    loadMatch(i);
+  });
+  function renderPool(){
+    renderPools();
+    const pool = state.pool;
+    $('flow').hidden = !pool;
+    $('poolView').hidden = !pool;
+    if (!pool) return;
+    const RM = realMatches(pool), N = RM.length, done = RM.filter(m => m.res).length, allDone = poolDone(pool);
+    $('flTitle').textContent = `Pool : ${pool.name} · ${done}/${N} combats terminés`;
+    if (pool.current >= 0){
+      const m = pool.matches[pool.current];
+      $('flMatch').innerHTML = `${matchLabel(pool, m)} : <span class="wa">${esc(pool.participants[m.a].name)}</span> contre <span class="wb">${esc(pool.participants[m.b].name)}</span>`;
+    } else $('flMatch').textContent = allDone ? 'Pool terminé – classement final disponible.' : (done ? 'Pool en pause.' : 'Pool prêt, pas encore lancé.');
+    const scr = state.screen || 'score';
+    document.querySelectorAll('[data-screen]').forEach(b => {
+      b.classList.toggle('on', b.dataset.screen === scr);
+      if (b.dataset.screen === 'callup') b.disabled = pool.current < 0;
+      if (b.dataset.screen === 'bracket') b.hidden = pool.format !== 'ko';
+    });
+    $('flStart').hidden = pool.current >= 0 || allDone;
+    $('flStart').textContent = done ? '▶ Reprendre le pool' : '▶ Lancer le pool';
+    $('flHajime').hidden = pool.current < 0 || scr === 'score';
+    $('flFinish').hidden = pool.current < 0;
+    $('flFinish').textContent = nextUnplayed(pool, pool.current) >= 0 ? 'Terminer le combat ▶ suivant' : 'Terminer le combat ▶ classement';
+    const np = allDone ? nextPool() : null;
+    $('flNextPool').hidden = !np;
+    if (np) $('flNextPool').textContent = `Pool suivant : ${np.name} ▶`;
+    $('pvName').textContent = `Sur le tatami : ${pool.name} – ${pool.participants.length} compétiteurs`;
+    $('pvRank').value = pool.ranking;
+    $('pvRank').parentElement.hidden = pool.format === 'ko';
+    $('pvHint').textContent = pool.format === 'ko'
+      ? (pool.repechage ? 'Élimination directe avec repêchage WKF : les compétiteurs battus par les deux finalistes sont repêchés ; les vainqueurs des deux repêchages obtiennent le bronze.' : 'Élimination directe sans repêchage : les deux demi-finalistes battus obtiennent le bronze.')
+      : 'Classement standard : victoires, puis confrontation directe, puis points marqués, puis points encaissés. Classement aux points : points marqués, puis victoires, puis points encaissés.';
+    const pn = i => i == null ? '<i style="color:var(--muted)">à déterminer</i>' : pool.participants[i].name;
+    const order = pool.matches.map((m,i) => i).filter(i => !isBye(pool.matches[i]));
+    if (pool.format === 'ko') order.sort((x,y) => koOrderKey(pool, pool.matches[x]) - koOrderKey(pool, pool.matches[y]));
+    $('pvMatches').innerHTML = order.map(i => {
+      const m = pool.matches[i];
+      const A = pn(m.a), B = pn(m.b), r = m.res;
+      const st = i === pool.current ? '<span class="st now">En cours</span>' : r ? '<span class="st done">Terminé</span>' : playable(m) ? '<span class="st">À venir</span>' : '<span class="st">En attente</span>';
+      const lbl = pool.format === 'ko' ? matchLabel(pool, m) : i+1;
+      const btn = i === pool.current || !(playable(m) || r) ? '' : (r && !canReplay(pool, i)) ? '' : `<button class="btn sm" data-load="${i}">${r ? 'Rejouer' : 'Charger'}</button>`;
+      return `<tr class="${i===pool.current?'cur':''}"><td style="white-space:nowrap">${lbl}</td>
+        <td class="${r && r.winner==='aka'?'wa':''}">${m.a == null ? A : esc(A)}</td>
+        <td class="res">${r ? `${r.sa} – ${r.sb}` : '–'}</td>
+        <td class="${r && r.winner==='ao'?'wb':''}">${m.b == null ? B : esc(B)}</td><td>${st}</td>
+        <td class="acts">${btn}</td></tr>`;
+    }).join('');
+    $('pvRanking').innerHTML = poolTable(pool).map(p => `<tr><td>${p.rank ?? '–'}</td><td><b>${esc(p.name)}</b><br><small style="color:var(--muted)">${esc(p.dojo)}${pool.format === 'ko' ? ' · ' + esc(p.label) : ''}</small></td><td>${p.w}</td><td>${p.l}</td><td>${p.pf}</td><td>${p.pa}</td></tr>`).join('');
+  }
+
+  /* --- sauvegarde & export --- */
+  const KEY_LASTBK = 'kumiteScore.lastBackup';
+  const stamp = () => { const d = new Date(), z = n => String(n).padStart(2,'0'); return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}_${z(d.getHours())}h${z(d.getMinutes())}`; };
+  function download(name, text, type){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  function renderBackupInfo(){
+    const last = load(KEY_LASTBK, null);
+    $('bkInfo').textContent = last ? `Dernière sauvegarde téléchargée : ${new Date(last).toLocaleString('fr-CH')}` : 'Aucune sauvegarde téléchargée depuis ce navigateur.';
+  }
+  function backup(){
+    const data = { app:'affichage-kumite', version:1, date:new Date().toISOString(), state, competitors, pools };
+    download(`kumite_sauvegarde_${stamp()}.json`, JSON.stringify(data, null, 1), 'application/json');
+    save(KEY_LASTBK, Date.now()); renderBackupInfo();
+  }
+  $('bkSave').addEventListener('click', backup);
+  $('quickSave').addEventListener('click', backup);
+  $('bkLoad').addEventListener('change', async e => {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    let data;
+    try { data = JSON.parse(await file.text()); } catch(_) { alert('Ce fichier n\'est pas une sauvegarde valide.'); return; }
+    if (!data || data.app !== 'affichage-kumite' || !Array.isArray(data.competitors) || !Array.isArray(data.pools)){ alert('Ce fichier n\'est pas une sauvegarde de l\'affichage kumite.'); return; }
+    const when = data.date ? new Date(data.date).toLocaleString('fr-CH') : '?';
+    if (!confirm(`Restaurer la sauvegarde du ${when} ?\n\n${data.competitors.length} compétiteurs · ${data.pools.length} pools\n\nToutes les données actuelles de ce navigateur seront remplacées.`)) return;
+    const st = data.state || newState();
+    if (st.timer) st.timer.running = false;
+    if (st.pool){ const i = data.pools.findIndex(p => p.id === st.pool.id); if (i >= 0) data.pools[i] = st.pool; }
+    save(KEY_COMP, data.competitors); save(KEY_POOLS, data.pools); save(KEY, st);
+    location.reload();
+  });
+  const csvCell = v => { const t = String(v ?? ''); return /[;"\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  const toCSV = rows => '﻿' + rows.map(r => r.map(csvCell).join(';')).join('\r\n') + '\r\n';
+  const fmtLabel = p => p.format === 'ko' ? (p.repechage ? 'Élimination directe + repêchage' : 'Élimination directe') : 'Poule';
+  const playedPools = () => pools.filter(p => hasResults(p));
+  $('exRank').addEventListener('click', () => {
+    const list = playedPools(); if (!list.length){ alert('Aucun pool n\'a encore de résultat.'); return; }
+    const rows = [['Pool', 'Format', 'Mode', 'Statut', 'Rang', 'Nom', 'Dojo', 'Résultat', 'Combats', 'Victoires', 'Défaites', 'Points marqués', 'Points encaissés']];
+    for (const p of list){
+      const status = poolDone(p) ? 'Terminé' : 'Provisoire';
+      for (const r of poolTable(p)) rows.push([p.name, fmtLabel(p), MODES[p.mode], status, r.rank ?? '', r.name, r.dojo, r.label || '', r.j, r.w, r.l, r.pf, r.pa]);
+    }
+    download(`kumite_classements_${stamp()}.csv`, toCSV(rows), 'text/csv;charset=utf-8');
+  });
+  $('exMatches').addEventListener('click', () => {
+    const list = playedPools(); if (!list.length){ alert('Aucun pool n\'a encore de résultat.'); return; }
+    const rows = [['Pool', 'Tour / n°', 'AKA', 'Dojo AKA', 'Score AKA', 'Score AO', 'AO', 'Dojo AO', 'Vainqueur', 'Yuko AKA', 'Waza-ari AKA', 'Ippon AKA', 'Yuko AO', 'Waza-ari AO', 'Ippon AO', 'Senshu', 'Mode']];
+    for (const p of list){
+      const idx = p.matches.map((m,i) => i).filter(i => p.matches[i].res && !p.matches[i].res.bye);
+      if (p.format === 'ko') idx.sort((x,y) => koOrderKey(p, p.matches[x]) - koOrderKey(p, p.matches[y]));
+      for (const i of idx){
+        const m = p.matches[i], r = m.res, A = p.participants[m.a], B = p.participants[m.b];
+        const fa = r.aka || {}, fb = r.ao || {};
+        rows.push([p.name, p.format === 'ko' ? matchLabel(p, m) : `Combat ${i+1}`, A.name, A.dojo, r.sa, r.sb, B.name, B.dojo,
+          r.winner === 'aka' ? A.name : B.name, fa.yuko ?? '', fa.waza ?? '', fa.ippon ?? '', fb.yuko ?? '', fb.waza ?? '', fb.ippon ?? '',
+          fa.senshu ? 'AKA' : fb.senshu ? 'AO' : '', MODES[r.mode] || '']);
+      }
+    }
+    download(`kumite_combats_${stamp()}.csv`, toCSV(rows), 'text/csv;charset=utf-8');
+  });
+  $('exComp').addEventListener('click', () => {
+    if (!competitors.length){ alert('La liste des compétiteurs est vide.'); return; }
+    const poolOf = c => pools.filter(p => poolMembers(p).some(x => x.id === c.id)).map(p => p.name).join(' / ');
+    const rows = [['Nom', 'Dojo', 'Sexe', 'Âge', 'Poids', 'Grade', 'Catégorie', 'Pool(s)']];
+    for (const c of competitors) rows.push([c.name, c.dojo, c.sex, c.age ?? '', c.weight != null ? String(c.weight).replace('.', ',') : '', gradeLabel(c.grade), c.category, poolOf(c)]);
+    download(`kumite_competiteurs_${stamp()}.csv`, toCSV(rows), 'text/csv;charset=utf-8');
+  });
+  renderBackupInfo();
+
+  /* --- competitors --- */
+  const YEAR = new Date().getFullYear();
+  const compText = c => [c.name, c.dojo, c.category, c.sex, c.age, c.weight, gradeLabel(c.grade)].join(' ').toLowerCase();
+  const compInfo = (c, short) => [short ? '' : c.dojo, c.sex, c.age != null && c.age !== '' ? c.age + ' ans' : '', c.weight != null && c.weight !== '' ? c.weight + ' kg' : '', gradeLabel(c.grade)].filter(Boolean).join(' · ');
+  $('fGrade').innerHTML = gradeOptions('Grade');
+  function saveComp(){ save(KEY_COMP, competitors); renderComp(); render(); }
+  function renderComp(){
+    const q = $('search').value.trim().toLowerCase();
+    const list = competitors.filter(c => !q || compText(c).includes(q));
+    const v = x => x == null ? '' : x;
+    $('compBody').innerHTML = list.length ? list.map(c => `
+      <tr><td><b>${esc(c.name)}</b></td><td>${esc(c.dojo)}</td><td>${esc(c.sex||'')}</td><td>${esc(v(c.age))}</td>
+      <td>${c.weight != null && c.weight !== '' ? esc(c.weight) + ' kg' : ''}</td><td>${esc(gradeLabel(c.grade))}</td><td>${esc(c.category||'')}</td>
+      <td class="acts"><button class="btn sm pick-aka" data-pick="aka" data-id="${c.id}">→ AKA</button>
+      <button class="btn sm pick-ao" data-pick="ao" data-id="${c.id}">→ AO</button>
+      <button class="btn sm" data-edit="${c.id}" title="Modifier">✎</button>
+      <button class="btn sm danger" data-del="${c.id}" title="Supprimer">✕</button></td></tr>`).join('')
+      : `<tr><td colspan="8" class="empty">${competitors.length ? 'Aucun résultat.' : 'Aucun compétiteur. Importez un CSV ou ajoutez-les ci-dessus.'}</td></tr>`;
+    let dl = $('compNames');
+    if (!dl){ dl = document.createElement('datalist'); dl.id = 'compNames'; document.body.appendChild(dl); }
+    dl.innerHTML = competitors.map(c => `<option value="${esc(c.name)}">${esc(c.dojo)}</option>`).join('');
+    renderEditor();
+  }
+  const form = $('addForm');
+  function resetForm(){ form.reset(); delete form.dataset.edit; $('addBtn').textContent = 'Ajouter'; $('cancelEdit').hidden = true; }
+  $('compBody').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.pick){
+      const c = competitors.find(x => x.id === b.dataset.id); if (!c) return;
+      const f = state[b.dataset.pick]; f.name = c.name; f.dojo = c.dojo;
+      if (c.category) state.category = c.category;
+      commit();
+    } else if (b.dataset.edit){
+      const c = competitors.find(x => x.id === b.dataset.edit); if (!c) return;
+      const el = form.elements;
+      el.name.value = c.name; el.dojo.value = c.dojo || ''; el.sex.value = c.sex || ''; el.age.value = c.age ?? '';
+      el.weight.value = c.weight ?? ''; el.grade.value = c.grade ?? ''; el.category.value = c.category || '';
+      form.dataset.edit = c.id; $('addBtn').textContent = 'Enregistrer'; $('cancelEdit').hidden = false; el.name.focus();
+    } else if (b.dataset.del){
+      competitors = competitors.filter(x => x.id !== b.dataset.del); saveComp();
+    }
+  });
+  $('cancelEdit').addEventListener('click', resetForm);
+  $('search').addEventListener('input', renderComp);
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const name = (fd.get('name')||'').trim(); if (!name) return;
+    const data = { name, dojo:(fd.get('dojo')||'').trim(), sex:fd.get('sex') || '', age:numOrNull(fd.get('age')),
+      weight:numOrNull(fd.get('weight')), grade:numOrNull(fd.get('grade')), category:(fd.get('category')||'').trim() };
+    if (form.dataset.edit){ const c = competitors.find(x => x.id === form.dataset.edit); if (c) Object.assign(c, data); }
+    else competitors.push(Object.assign({ id:uid() }, data));
+    resetForm(); form.elements.name.focus(); saveComp();
+  });
+  $('clearList').addEventListener('click', () => { if (competitors.length && confirm('Supprimer tous les compétiteurs de la liste ?')) { competitors = []; saveComp(); } });
+  $('dlTemplate').addEventListener('click', () => {
+    const txt = '﻿Nom;Prénom;Dojo;Sexe;Année de naissance;Poids;Grade;Catégorie\n' +
+      'Muller;Léa;Karaté Club Lausanne;F;2014;41.5;5e kyu;\nRossi;Marco;Dojo Genève;M;2013;38;jaune;\n';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([txt], { type:'text/csv;charset=utf-8' }));
+    a.download = 'competiteurs_modele.csv'; document.body.appendChild(a); a.click(); a.remove();
+  });
+  $('csvFile').addEventListener('change', async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const buf = await file.arrayBuffer();
+    let text;
+    try { text = new TextDecoder('utf-8', { fatal:true }).decode(buf); }
+    catch(_) { text = new TextDecoder('windows-1252').decode(buf); }
+    const added = parseCompetitors(text);
+    e.target.value = '';
+    if (!added.length){ alert('Aucun compétiteur trouvé dans ce fichier.'); return; }
+    if (competitors.length && confirm(`${added.length} compétiteurs trouvés.\n\nOK = remplacer la liste actuelle\nAnnuler = les ajouter à la liste`)) competitors = [];
+    competitors.push(...added); saveComp();
+    $('compMsg').textContent = `${added.length} compétiteurs importés.`;
+    setTimeout(() => $('compMsg').textContent = '', 4000);
+  });
+
+  function parseCSV(text){
+    text = text.replace(/^﻿/, '');
+    const first = text.split(/\r?\n/)[0] || '';
+    const count = ch => first.split(ch).length - 1;
+    const delim = [';', ',', '\t'].sort((a,b) => count(b) - count(a))[0];
+    const rows = []; let row = [], cell = '', q = false;
+    for (let i = 0; i < text.length; i++){
+      const ch = text[i];
+      if (q){
+        if (ch === '"'){ if (text[i+1] === '"'){ cell += '"'; i++; } else q = false; }
+        else cell += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === delim){ row.push(cell); cell = ''; }
+      else if (ch === '\n' || ch === '\r'){
+        if (ch === '\r' && text[i+1] === '\n') i++;
+        row.push(cell); rows.push(row); row = []; cell = '';
+      } else cell += ch;
+    }
+    if (cell !== '' || row.length){ row.push(cell); rows.push(row); }
+    return rows.map(r => r.map(c => c.trim())).filter(r => r.some(c => c));
+  }
+  function parseSex(v){
+    const t = String(v||'').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (!t) return '';
+    if (/^(f|w|d|fille|femme|feminin|female|dame|weiblich)/.test(t)) return 'F';
+    if (/^(m|h|g|garcon|homme|masculin|male|herr|mannlich)/.test(t)) return 'M';
+    return '';
+  }
+  function parseCompetitors(text){
+    const rows = parseCSV(text); if (!rows.length) return [];
+    const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    const h = rows[0].map(norm);
+    const find = re => h.findIndex(x => re.test(x));
+    let iName = find(/^(nom|name|nom complet|competiteur|athlete|nom et prenom|nom prenom)$/);
+    if (iName < 0) iName = find(/^nom|name|competiteur|athlete/);
+    const iFirst = find(/prenom|first|vorname/);
+    const iDojo = find(/dojo|club|ecole|team|equipe|verein/);
+    const iCat = find(/^cat/);
+    const iSex = find(/^(sexe|sex|genre|gender|geschlecht|s|m\/f|f\/m)$/);
+    const iAge = find(/^(age|ans|alter)$/);
+    const iBirth = find(/naissance|annee|birth|jahrgang|ne le|ne\(e\)/);
+    const iW = find(/poids|weight|gewicht|^kg$/);
+    const iG = find(/grade|ceinture|kyu|belt|gurt/);
+    const hasHeader = [iName, iDojo, iCat, iSex, iAge, iBirth, iW, iG].some(i => i >= 0);
+    const data = hasHeader ? rows.slice(1) : rows;
+    const N = hasHeader ? iName : 0, D = hasHeader ? iDojo : 1, C = hasHeader ? iCat : 2, F = hasHeader && iFirst !== iName ? iFirst : -1;
+    const cell = (r, i) => i >= 0 ? (r[i] || '') : '';
+    return data.map(r => {
+      const name = [cell(r, F), cell(r, N)].filter(Boolean).join(' ').trim();
+      let age = numOrNull(cell(r, iAge));
+      if (age == null){ const m = cell(r, iBirth).match(/(\d{4})/); if (m) age = YEAR - +m[1]; }
+      const wt = numOrNull(cell(r, iW).replace(',', '.').replace(/[^\d.]/g, ''));
+      return { id:uid(), name, dojo:cell(r, D), category:cell(r, C), sex:parseSex(cell(r, iSex)), age, weight:wt, grade:parseGrade(cell(r, iG)) };
+    }).filter(c => c.name);
+  }
+
+  if (chan) chan.onmessage = e => { if (e.data && e.data.type === 'hello') broadcast({ type:'state', state }); };
+  if (state.timer.running && remainingNow() <= 0){ state.timer.running = false; state.timer.remaining = 0; }
+  renderComp();
+  commit();
+}
+
+if (IS_DISPLAY) initDisplay(); else initControl();
+})();
+</script>
+</body>
+</html>

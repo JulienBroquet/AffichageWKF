@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administration – Affichage Kumite</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body class="page">
+<header class="topnav">
+  <span class="brand">🥋 Administration des tournois</span>
+  <span class="spacer"></span>
+  <a href="index.html">Accueil</a>
+  <button class="btn sm ghost" id="logout" hidden>Déconnexion</button>
+</header>
+
+<main class="narrow" id="loginBox">
+  <form class="card stack" id="loginForm">
+    <h1>Connexion super-admin</h1>
+    <label>Mot de passe<input type="password" id="pw" autocomplete="current-password" required></label>
+    <button class="btn primary">Se connecter</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+</main>
+
+<main class="wide" id="app" hidden>
+  <section class="card">
+    <h2 style="margin-top:0">Nouveau tournoi</h2>
+    <form id="createForm">
+      <div class="formgrid">
+        <label>Nom<input name="name" required placeholder="Coupe de Noël 2026"></label>
+        <label>Date<input name="date" type="date"></label>
+        <label>Lieu<input name="place" placeholder="Salle de sport, ville"></label>
+        <label>Nombre de tatamis<input name="tatamis" type="number" min="1" max="20" value="2" required></label>
+        <label>Code organisateur (4 car. min.)<input name="pin_orga" required minlength="4" autocomplete="off"></label>
+        <label>Code des tables (4 car. min.)<input name="pin_table" required minlength="4" autocomplete="off"></label>
+      </div>
+      <button class="btn primary">Créer le tournoi</button>
+      <span class="ok" id="createMsg"></span>
+    </form>
+  </section>
+
+  <section class="card" style="margin-top:14px">
+    <div class="ctools"><h2 style="margin:0">Tournois</h2><div class="spacer" style="flex:1"></div>
+      <label class="f"><input type="checkbox" id="showArchived" checked> afficher les archivés</label></div>
+    <table class="tablelist">
+      <thead><tr><th>Date</th><th>Tournoi</th><th>Clé</th><th>Tatamis</th><th>Compét.</th><th>Pools</th><th>Combats</th><th>Statut</th><th></th></tr></thead>
+      <tbody id="list"></tbody>
+    </table>
+  </section>
+
+  <section class="card" style="margin-top:14px">
+    <h2 style="margin-top:0">Mot de passe super-admin</h2>
+    <form id="pwForm" class="ctools">
+      <input type="password" id="newPw" placeholder="Nouveau mot de passe (8 car. min.)" minlength="8" required autocomplete="new-password" style="padding:8px;border:1px solid var(--line);border-radius:7px">
+      <button class="btn sm">Changer</button><span class="ok" id="pwMsg"></span>
+    </form>
+  </section>
+</main>
+
+<script src="assets/api.js"></script>
+<script>
+(() => {
+  const S_ID = '__admin';
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let rows = [];
+  async function start(){
+    const s = Sess.get(S_ID);
+    if (s){ Api.token = s.token; try { await refresh(); show(true); return; } catch(e){ Sess.set(S_ID, null); } }
+    show(false);
+  }
+  function show(on){ $id('loginBox').hidden = on; $id('app').hidden = !on; $id('logout').hidden = !on; }
+  $id('loginForm').addEventListener('submit', async e => {
+    e.preventDefault(); $id('loginErr').textContent = '';
+    try { const r = await Api.call('admin_login', { password: $id('pw').value }); Api.token = r.token; Sess.set(S_ID, { token: r.token, role:'admin', at: Date.now() }); await refresh(); show(true); }
+    catch(err){ $id('loginErr').textContent = err.message; }
+  });
+  $id('logout').addEventListener('click', async () => { try { await Api.call('logout'); } catch(e){} Sess.set(S_ID, null); location.reload(); });
+
+  async function refresh(){
+    const r = await Api.call('admin_list'); rows = r.tournaments; render();
+  }
+  function render(){
+    const showA = $id('showArchived').checked;
+    const list = rows.filter(t => showA || t.status !== 'archived');
+    $id('list').innerHTML = list.length ? list.map(t => `<tr>
+      <td>${t.tdate ? new Date(t.tdate + 'T12:00').toLocaleDateString('fr-CH') : '–'}</td>
+      <td><b>${esc(t.name)}</b><br><small class="muted">${esc(t.place)}</small></td>
+      <td><span class="keytag">${esc(t.tkey)}</span></td>
+      <td>${t.tatamis}</td><td>${t.n_comp}</td><td>${t.n_pools}</td><td>${t.n_results}</td>
+      <td>${t.status === 'archived' ? '<span class="pill grey">Archivé</span>' : '<span class="pill green">Actif</span>'}</td>
+      <td class="acts">
+        <button class="btn sm primary" data-a="enter" data-id="${t.id}">Ouvrir</button>
+        <a class="btn sm" href="public.html#${esc(t.tkey)}" target="_blank">Public</a>
+        <button class="btn sm" data-a="edit" data-id="${t.id}">Modifier</button>
+        <button class="btn sm" data-a="${t.status === 'archived' ? 'unarchive' : 'archive'}" data-id="${t.id}">${t.status === 'archived' ? 'Réactiver' : 'Archiver'}</button>
+        <button class="btn sm danger" data-a="del" data-id="${t.id}" title="Supprimer définitivement">✕</button>
+      </td></tr>`).join('') : '<tr><td colspan="9" class="empty">Aucun tournoi pour l\'instant.</td></tr>';
+  }
+  $id('showArchived').addEventListener('change', render);
+
+  $id('createForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(e.target));
+    try {
+      const r = await Api.call('admin_create', fd);
+      e.target.reset(); e.target.elements.tatamis.value = 2;
+      $id('createMsg').innerHTML = `Tournoi créé – clé : <span class="keytag">${esc(r.key)}</span>`;
+      await refresh();
+    } catch(err){ alert(err.message); }
+  });
+
+  $id('list').addEventListener('click', async e => {
+    const b = e.target.closest('[data-a]'); if (!b) return;
+    const t = rows.find(x => x.id == b.dataset.id); if (!t) return;
+    try {
+      if (b.dataset.a === 'enter'){
+        const r = await Api.call('admin_enter', { id: t.id });
+        Sess.set(`${r.key}/orga`, { key: r.key, token: r.token, role:'orga', name: t.name, at: Date.now() });
+        location.href = 'orga.html#' + r.key;
+      } else if (b.dataset.a === 'archive' || b.dataset.a === 'unarchive'){
+        await Api.call('admin_update', { id: t.id, status: b.dataset.a === 'archive' ? 'archived' : 'active' }); await refresh();
+      } else if (b.dataset.a === 'edit'){
+        const name = prompt('Nom du tournoi', t.name); if (name === null) return;
+        const date = prompt('Date (AAAA-MM-JJ)', t.tdate || ''); if (date === null) return;
+        const place = prompt('Lieu', t.place || ''); if (place === null) return;
+        const tatamis = prompt('Nombre de tatamis', t.tatamis); if (tatamis === null) return;
+        const po = prompt('Nouveau code organisateur (laisser vide pour ne pas changer)', ''); if (po === null) return;
+        const pt = prompt('Nouveau code des tables (laisser vide pour ne pas changer)', ''); if (pt === null) return;
+        await Api.call('admin_update', { id: t.id, name, date, place, tatamis, pin_orga: po, pin_table: pt }); await refresh();
+      } else if (b.dataset.a === 'del'){
+        const k = prompt(`Suppression DÉFINITIVE de « ${t.name} » et de tous ses résultats.\nPour confirmer, tapez la clé du tournoi (${t.tkey}) :`);
+        if (!k) return;
+        await Api.call('admin_delete', { id: t.id, confirm_key: k }); await refresh();
+      }
+    } catch(err){ alert(err.message); }
+  });
+
+  $id('pwForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    try { await Api.call('admin_password', { password: $id('newPw').value }); $id('newPw').value = ''; $id('pwMsg').textContent = 'Mot de passe modifié.'; }
+    catch(err){ alert(err.message); }
+  });
+  start();
+})();
+</script>
+</body>
+</html>

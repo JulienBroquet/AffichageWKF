@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Résultats en direct – Affichage Kumite</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body class="page">
+<header class="topnav">
+  <span class="brand" id="brand">🥋 Résultats en direct</span>
+  <span class="spacer"></span>
+  <span class="net wait" id="net">…</span>
+</header>
+<main class="pub">
+  <div class="muted" id="meta" style="margin:4px 0 10px"></div>
+  <div class="tabs pubtabs">
+    <button data-tab="live" class="on">En direct</button>
+    <button data-tab="pools">Pools</button>
+    <button data-tab="ranks">Classements</button>
+  </div>
+  <div data-pane="live"><div class="live" id="live"></div></div>
+  <div data-pane="pools" hidden>
+    <input type="search" id="q" placeholder="Rechercher un nom, un club, un pool…" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:10px">
+    <div class="plist" id="pools"></div>
+  </div>
+  <div data-pane="ranks" hidden><div class="plist" id="ranks"></div></div>
+  <p class="muted" style="text-align:center;font-size:12px;margin-top:20px">Mise à jour automatique · <a href="index.html">Accueil</a></p>
+</main>
+<script src="assets/api.js"></script>
+<script src="assets/core.js"></script>
+<script>
+(() => {
+  const KEY = fmtKey(decodeURIComponent(location.hash.slice(1)));
+  if (!KEY){ location.href = 'index.html'; return; }
+  let tour = null, rev = 0, offset = 0;
+  const pools = {}, live = {};
+  const open = new Set();
+  const list = () => Object.values(pools).sort((a, b) => (a.tatami || 99) - (b.tatami || 99) || (a.sort || 0) - (b.sort || 0) || String(a.name).localeCompare(b.name));
+
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== b.dataset.tab);
+  }));
+  $id('q').addEventListener('input', renderPools);
+  document.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.pid){ d.open ? open.add(d.dataset.pid) : open.delete(d.dataset.pid); } }, true);
+
+  async function sync(){
+    try {
+      const r = await Api.call('public_sync', { key: KEY, since: rev });
+      offset = r.now - Date.now();
+      tour = r.tournament;
+      if (r.full) for (const k in pools) delete pools[k];
+      for (const p of r.pools){ if (p.deleted) delete pools[p.id]; else pools[p.id] = p.data; }
+      for (const l of r.live) live[l.tatami] = l;
+      const changed = r.full || r.pools.length;
+      rev = r.rev;
+      $id('net').className = 'net'; $id('net').textContent = 'En direct';
+      $id('brand').textContent = '🥋 ' + tour.name;
+      document.title = tour.name + ' – résultats';
+      $id('meta').textContent = [tour.date ? new Date(tour.date + 'T12:00').toLocaleDateString('fr-CH', { day:'numeric', month:'long', year:'numeric' }) : '', tour.place, tour.status === 'archived' ? 'tournoi terminé (archivé)' : ''].filter(Boolean).join(' · ');
+      renderLive();
+      if (changed){ renderPools(); renderRanks(); }
+    } catch(err){
+      $id('net').className = 'net off'; $id('net').textContent = 'Hors ligne';
+      if (err.code === 'not_found'){ document.querySelector('.pub').innerHTML = '<div class="card">Tournoi introuvable. Vérifiez le lien.</div>'; clearInterval(timer); }
+    }
+  }
+  function remaining(l){
+    const t = (l.data && l.data.timer) || { running:false, remaining:0 };
+    if (!t.running) return t.remaining;
+    return Math.max(0, t.remaining - ((Date.now() + offset) - l.updated_ms));
+  }
+  function renderLive(){
+    if (!tour) return;
+    $id('live').innerHTML = Array.from({ length: tour.tatamis }, (_, i) => {
+      const t = i + 1, l = live[t];
+      const fresh = l && ((Date.now() + offset) - l.updated_ms) < 60000;
+      if (!l || !fresh || !l.data || !(l.data.aka && (l.data.aka.name || l.data.ao.name))){
+        const next = list().filter(p => +p.tatami === t && poolStatusOf(p) !== 'done')[0];
+        return `<div class="lcard"><div class="lh"><span>Tatami ${t}</span><span class="muted">en attente</span></div>
+          <div class="lf">${next ? 'Prochain pool : <b>' + esc(next.name) + '</b>' : 'Aucun combat en cours'}</div></div>`;
+      }
+      const d = l.data, A = d.aka, B = d.ao;
+      const showTimer = d.mode !== 'promo';
+      const row = (f, side) => `<div class="lrow ${side}"><div><div class="n">${esc(f.name || side.toUpperCase())}${d.winner === side ? ' 🏆' : ''}${f.senshu && d.mode === 'wkf' ? ' <span class="pill" style="background:#fde68a">S</span>' : ''}</div><div class="d">${esc(f.dojo || '')}</div></div><b>${total(f)}</b></div>`;
+      return `<div class="lcard"><div class="lh"><span>Tatami ${t}${d.poolName ? ' · ' + esc(d.poolName) : ''}</span>${showTimer ? `<span class="lclock" data-t="${t}">${fmt(remaining(l))}</span>` : ''}</div>
+        ${row(A, 'aka')}${row(B, 'ao')}<div class="lf">${esc(d.matchLabel || '')}${d.winner ? ' · combat terminé' : ''}</div></div>`;
+    }).join('');
+  }
+  setInterval(() => document.querySelectorAll('.lclock').forEach(el => { const l = live[el.dataset.t]; if (l) el.textContent = fmt(remaining(l)); }), 250);
+
+  function matchRow(p, m){
+    const pn = i => i == null ? '<span class="muted">à déterminer</span>' : esc(p.participants[i].name);
+    const r = m.res;
+    return `<div class="mres"><span class="${r && r.winner === 'aka' ? 'w' : ''}" style="border-left:3px solid var(--aka);padding-left:6px">${pn(m.a)}</span>
+      <span class="c">${r ? r.sa + ' – ' + r.sb : 'vs'}</span><span class="r ${r && r.winner === 'ao' ? 'w' : ''}" style="border-right:3px solid var(--ao);padding-right:6px">${pn(m.b)}</span></div>`;
+  }
+  function poolBody(p){
+    let html = '';
+    if (p.format === 'ko'){
+      const order = p.matches.filter(m => !isBye(m)).sort((x, y) => koOrderKey(p, x) - koOrderKey(p, y));
+      let last = '';
+      for (const m of order){ const lab = matchLabel(p, m).replace(/ · combat \d+$/, ''); if (lab !== last){ html += `<div class="mres"><span class="lab">${esc(lab)}</span></div>`; last = lab; } html += matchRow(p, m); }
+    } else html = p.matches.map(m => matchRow(p, m)).join('');
+    return html || '<div class="muted">Pas encore de combats.</div>';
+  }
+  function rankTable(p){
+    const T = poolTable(p);
+    return `<table class="tablelist" style="margin-top:8px"><thead><tr><th>Rg</th><th>Nom</th>${p.format === 'ko' ? '<th>Résultat</th>' : '<th>V</th><th>Pts</th>'}</tr></thead>
+      <tbody>${T.map(r => `<tr><td><b>${r.rank ?? '–'}</b></td><td>${esc(r.name)}<br><small class="muted">${esc(r.dojo)}</small></td>${p.format === 'ko' ? `<td>${esc(r.label)}</td>` : `<td>${r.w}</td><td>${r.pf}</td>`}</tr>`).join('')}</tbody></table>`;
+  }
+  function pill(p){ const s = poolStatusOf(p); return s === 'done' ? '<span class="pill green">Terminé</span>' : s === 'live' ? '<span class="pill blue">En cours</span>' : `<span class="pill grey">${p.tatami ? 'Tatami ' + p.tatami : 'À venir'}</span>`; }
+  function renderPools(){
+    const q = $id('q').value.trim().toLowerCase();
+    const L = list().filter(p => !q || p.name.toLowerCase().includes(q) || p.participants.some(x => (x.name + ' ' + x.dojo).toLowerCase().includes(q)));
+    $id('pools').innerHTML = L.length ? L.map(p => `<details data-pid="${p.id}" ${open.has(p.id) || q ? 'open' : ''}>
+      <summary><span>${esc(p.name)} <small class="muted">· ${p.participants.length} compét.</small></span>${pill(p)}</summary>
+      <div class="muted" style="font-size:12px;margin:6px 0">${esc(formatLabel(p))}${p.tatami ? ' · tatami ' + p.tatami : ''}</div>
+      ${poolBody(p)}${hasResults(p) ? rankTable(p) : ''}</details>`).join('') : '<div class="card muted">Aucun pool publié pour l\'instant.</div>';
+  }
+  function renderRanks(){
+    const L = list().filter(p => poolDone(p) && realMatches(p).length);
+    $id('ranks').innerHTML = L.length ? L.map(p => `<details open><summary><span>${esc(p.name)}</span><span class="pill green">Final</span></summary>${rankTable(p)}</details>`).join('')
+      : '<div class="card muted">Les classements apparaîtront ici à la fin de chaque pool.</div>';
+  }
+  sync();
+  const timer = setInterval(sync, 3000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Affichage Kumite – Accueil</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body class="page">
+<main class="narrow">
+  <div class="card stack">
+    <h1>🥋 Affichage Kumite</h1>
+    <p class="muted" style="margin:0">Entrez la clé du tournoi (8 caractères, ex. <span class="keytag">K7F3-9QX2</span>).</p>
+    <form id="keyForm" class="stack">
+      <input id="key" class="keyinput" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" required>
+      <button class="btn primary">Continuer</button>
+      <div class="err" id="keyErr"></div>
+    </form>
+  </div>
+
+  <div class="card stack" id="tCard" hidden style="margin-top:14px">
+    <div>
+      <h2 style="margin:0" id="tName"></h2>
+      <div class="muted" id="tMeta"></div>
+    </div>
+    <div class="roles">
+      <button class="btn" data-role="table">🥋 Table de marque<small>scores d'un tatami</small></button>
+      <button class="btn" data-role="orga">🗂️ Organisation<small>inscriptions, pools</small></button>
+      <a class="btn" id="pubLink" href="#">📱 Résultats en direct<small>public, sans code</small></a>
+    </div>
+    <form id="loginForm" class="stack" hidden>
+      <label id="tatWrap">Tatami<select id="tatami"></select></label>
+      <label><span id="pinLabel">Code</span><input id="pin" type="password" autocomplete="current-password" required></label>
+      <button class="btn primary" id="loginBtn">Se connecter</button>
+      <div class="err" id="loginErr"></div>
+    </form>
+  </div>
+
+  <div id="resume" class="card stack" hidden style="margin-top:14px">
+    <b>Sessions ouvertes sur cet appareil</b>
+    <div id="resumeList" class="stack"></div>
+  </div>
+
+  <p class="muted" style="text-align:center;margin-top:24px"><a href="admin.html">Administration des tournois</a></p>
+</main>
+<script src="assets/api.js"></script>
+<script>
+(() => {
+  let tour = null, role = null;
+  const keyIn = $id('key');
+  keyIn.addEventListener('input', () => { const p = keyIn.selectionStart; keyIn.value = fmtKey(keyIn.value); });
+  const hashKey = fmtKey(location.hash.slice(1));
+  if (hashKey.length === 9) { keyIn.value = hashKey; setTimeout(() => $id('keyForm').requestSubmit(), 0); }
+
+  $id('keyForm').addEventListener('submit', async e => {
+    e.preventDefault(); $id('keyErr').textContent = '';
+    try {
+      const r = await Api.call('info', { key: keyIn.value });
+      tour = r.tournament;
+      $id('tName').textContent = tour.name;
+      $id('tMeta').innerHTML = [tour.date ? new Date(tour.date + 'T12:00').toLocaleDateString('fr-CH', { weekday:'long', day:'numeric', month:'long', year:'numeric' }) : '', tour.place, `${tour.tatamis} tatami${tour.tatamis > 1 ? 's' : ''}`, tour.status === 'archived' ? '<b>archivé (lecture seule)</b>' : ''].filter(Boolean).join(' · ');
+      $id('pubLink').href = 'public.html#' + tour.key;
+      $id('tatami').innerHTML = Array.from({ length: tour.tatamis }, (_, i) => `<option value="${i+1}">Tatami ${i+1}</option>`).join('');
+      $id('tCard').hidden = false; $id('loginForm').hidden = true;
+      history.replaceState(null, '', '#' + tour.key);
+    } catch(err){ $id('keyErr').textContent = err.message; $id('tCard').hidden = true; }
+  });
+
+  document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => {
+    role = b.dataset.role;
+    document.querySelectorAll('[data-role]').forEach(x => x.classList.toggle('dark', x === b));
+    $id('tatWrap').hidden = role !== 'table';
+    $id('pinLabel').textContent = role === 'table' ? 'Code des tables' : 'Code organisateur';
+    $id('loginForm').hidden = false; $id('loginErr').textContent = ''; $id('pin').value = ''; $id('pin').focus();
+  }));
+
+  $id('loginForm').addEventListener('submit', async e => {
+    e.preventDefault(); $id('loginErr').textContent = '';
+    try {
+      const r = await Api.call('login', { key: tour.key, role, pin: $id('pin').value, tatami: +$id('tatami').value });
+      const sid = role === 'table' ? `${tour.key}/t${r.tatami}` : `${tour.key}/orga`;
+      Sess.set(sid, { key: tour.key, token: r.token, role, tatami: r.tatami, name: tour.name, at: Date.now() });
+      location.href = role === 'table' ? `table.html#${tour.key}/${r.tatami}` : `orga.html#${tour.key}`;
+    } catch(err){ $id('loginErr').textContent = err.message; }
+  });
+
+  const sessions = Object.entries(Sess.all()).sort((a, b) => b[1].at - a[1].at);
+  if (sessions.length){
+    $id('resume').hidden = false;
+    $id('resumeList').innerHTML = sessions.map(([sid, s]) => `<div class="prow"><span class="nm"><b>${esc(s.name || s.key)}</b> · ${s.role === 'table' ? 'Table – tatami ' + s.tatami : 'Organisation'} <span class="keytag">${esc(s.key)}</span></span>
+      <a class="btn sm primary" href="${s.role === 'table' ? `table.html#${s.key}/${s.tatami}` : `orga.html#${s.key}`}">Reprendre</a>
+      <button class="btn sm danger" data-forget="${esc(sid)}" title="Oublier">✕</button></div>`).join('');
+    $id('resumeList').addEventListener('click', e => { const b = e.target.closest('[data-forget]'); if (b){ Sess.set(b.dataset.forget, null); b.closest('.prow').remove(); } });
+  }
+  function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+})();
+</script>
+</body>
+</html>

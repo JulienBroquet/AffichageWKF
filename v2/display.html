@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Écran tatami – Affichage Kumite</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body class="is-display">
+<div id="display">
+  <div class="d-wrap" id="displayRoot"></div>
+  <div class="d-hint" id="dHint">Cliquez pour passer en plein écran et activer le son</div>
+</div>
+<script src="assets/core.js"></script>
+<script>
+(() => {
+  // display.html#CLE/TATAMI : reçoit l'état de la table de marque ouverte sur le même PC
+  const [key, tat] = decodeURIComponent(location.hash.slice(1)).split('/');
+  const STORE = `kumite2.state.${key}.t${tat}`;
+  document.title = `Tatami ${tat} – écran`;
+  openChannel(`kumite-${key}-t${tat}`);
+  try { const s = JSON.parse(localStorage.getItem(STORE)); if (s) state = normalizeState(s); } catch(e){}
+  const board = createBoard(document.getElementById('displayRoot'));
+  const hint = document.getElementById('dHint');
+  function goFull(){ const el = document.documentElement; if (el.requestFullscreen) el.requestFullscreen().catch(()=>{}); }
+  hint.addEventListener('click', () => { goFull(); audio(); hint.style.opacity = 0; setTimeout(() => hint.remove(), 600); });
+  document.addEventListener('dblclick', () => { if (document.fullscreenElement) document.exitFullscreen(); else goFull(); });
+  if (chan) chan.onmessage = e => {
+    const m = e.data; if (!m) return;
+    if (m.type === 'state'){ state = normalizeState(m.state); board.render(); }
+    if (m.type === 'sound') playLocal(m.kind);
+  };
+  window.addEventListener('storage', e => { if (e.key === STORE && e.newValue){ try { state = normalizeState(JSON.parse(e.newValue)); board.render(); } catch(_){} } });
+  (function loop(){ board.renderClock(); requestAnimationFrame(loop); })();
+  board.render();
+  broadcast({ type:'hello' });
+})();
+</script>
+</body>
+</html>

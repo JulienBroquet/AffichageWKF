@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Table de marque – Affichage Kumite</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<div id="control">
+  <header class="c-top">
+    <div class="brand" id="brand">Tatami</div>
+    <span class="net wait" id="net">Connexion…</span>
+    <label>Mode
+      <select id="mode">
+        <option value="wkf">WKF</option>
+        <option value="k4x15">4 × 15</option>
+        <option value="promo">Promo</option>
+      </select>
+    </label>
+    <label>Catégorie <input id="category" placeholder="U14 F -42 kg"></label>
+    <div class="spacer"></div>
+    <button class="btn ghost" id="logout">Déconnexion</button>
+    <button class="btn primary" id="openDisplay">Ouvrir l'affichage ↗</button>
+  </header>
+
+  <main class="c-main">
+    <section class="card flow" id="flow" hidden>
+      <div class="flow-info"><b id="flTitle"></b><span id="flMatch"></span></div>
+      <div class="flow-screens">Écran :
+        <button data-screen="list">Liste</button><button data-screen="bracket">Tableau</button><button data-screen="callup">Appel</button><button data-screen="score">Score</button><button data-screen="ranking">Classement</button>
+      </div>
+      <div class="flow-acts">
+        <button class="btn primary" id="flStart">▶ Lancer le pool</button>
+        <button class="btn dark" id="flHajime">Afficher le score</button>
+        <button class="btn win" id="flFinish">Terminer le combat ▶ suivant</button>
+        <button class="btn primary" id="flNextPool">Pool suivant ▶</button>
+      </div>
+    </section>
+    <section class="c-row">
+      <div class="card fighter aka" id="f-aka"></div>
+      <div class="card timercard">
+        <div class="phase" id="cPhase"></div>
+        <div class="bigclock" id="cClock">03:00</div>
+        <button class="startstop tctl" id="startStop">▶ Démarrer</button>
+        <div class="trow tctl">
+          <button class="btn sm" data-adj="-10000">−10 s</button>
+          <button class="btn sm" data-adj="-1000">−1 s</button>
+          <button class="btn sm" data-adj="1000">+1 s</button>
+          <button class="btn sm" data-adj="10000">+10 s</button>
+        </div>
+        <div class="trow tctl">
+          <button class="btn sm" id="resetTimer">↺ Remettre le temps</button>
+          <input id="setTime" placeholder="m:ss">
+          <button class="btn sm" id="applyTime">Régler</button>
+        </div>
+        <div class="trow" id="phaseCtl">
+          <button class="btn sm" id="prevPhase">◀</button>
+          <button class="btn sm dark" id="nextPhase">Phase suivante ▶</button>
+        </div>
+        <div class="alertbox" id="cAlert" hidden></div>
+        <div class="trow">
+          <button class="btn sm" id="undo">↶ Annuler</button>
+          <button class="btn sm" id="swapSides">⇄ Côtés écran</button>
+          <button class="btn sm danger" id="newMatch">Nouveau combat</button>
+        </div>
+        <div class="hint">
+          <kbd>Espace</kbd> départ / arrêt ·
+          AKA <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · AO <kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> = Yuko / Waza-ari / Ippon
+          (<kbd>Maj</kbd> pour retirer) · <kbd>N</kbd> phase suivante · <kbd>Ctrl</kbd>+<kbd>Z</kbd> annuler
+        </div>
+      </div>
+      <div class="card fighter ao" id="f-ao"></div>
+    </section>
+
+    <section class="card">
+      <div class="tabs">
+        <button data-tab="pool" class="on">Pools du tatami</button>
+        <button data-tab="settings">Réglages</button>
+        <button data-tab="preview">Aperçu de l'écran</button>
+      </div>
+
+      <div data-pane="pool">
+        <div class="pwarn" id="offlineWarn" hidden></div>
+        <div class="pcards" id="poolCards"></div>
+        <div id="poolView" hidden>
+          <div class="ctools">
+            <b id="pvName" style="font-size:17px"></b>
+            <div class="spacer" style="flex:1"></div>
+            <button class="btn sm" id="pUnload">Retirer du tatami</button>
+          </div>
+          <div class="pgrid">
+            <div><h4>Combats</h4><table><thead><tr><th>#</th><th>AKA</th><th style="text-align:center">Score</th><th>AO</th><th></th><th></th></tr></thead><tbody id="pvMatches"></tbody></table></div>
+            <div><h4>Classement</h4><table><thead><tr><th>Rg</th><th>Nom</th><th>V</th><th>D</th><th>Pts +</th><th>Pts −</th></tr></thead><tbody id="pvRanking"></tbody></table></div>
+          </div>
+          <p class="hint" id="pvHint"></p>
+        </div>
+      </div>
+
+      <div data-pane="settings" hidden>
+        <div class="settings">
+          <fieldset>
+            <legend>Mode WKF</legend>
+            <label>Durée du combat (s) <input type="number" min="10" step="5" data-set="wkf.duration"></label>
+            <label>Atoshi baraku à (s restantes) <input type="number" min="0" data-set="wkf.atoshi"></label>
+            <label>Écart de victoire (points, 0 = aucun) <input type="number" min="0" data-set="wkf.gap"></label>
+            <label>Senshu automatique au 1er point <input type="checkbox" data-set="wkf.autoSenshu"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Mode 4 × 15</legend>
+            <label>Durée d'un assaut (s) <input type="number" min="5" data-set="k4x15.duration"></label>
+            <label>Signal avant la fin (s, 0 = aucun) <input type="number" min="0" data-set="k4x15.atoshi"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Mode Promo</legend>
+            <label>Afficher un chronomètre <input type="checkbox" data-set="promo.useTimer"></label>
+            <label>Durée (s) <input type="number" min="5" data-set="promo.duration"></label>
+            <label>Signal avant la fin (s, 0 = aucun) <input type="number" min="0" data-set="promo.atoshi"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Son</legend>
+            <label>Jouer les signaux sur
+              <select data-set="sound.out">
+                <option value="control">l'ordinateur de gestion</option>
+                <option value="display">la fenêtre d'affichage</option>
+                <option value="both">les deux</option>
+              </select>
+            </label>
+            <label>Volume <input type="range" min="0" max="1" step="0.05" data-set="sound.volume"></label>
+            <div class="trow" style="justify-content:flex-start">
+              <button class="btn sm" id="testAtoshi">Tester atoshi baraku</button>
+              <button class="btn sm" id="testEnd">Tester fin du temps</button>
+            </div>
+          </fieldset>
+        </div>
+        <p class="hint" style="margin-top:12px">Les durées sont fixées par l'organisation ; vous pouvez les ajuster ici pour ce tatami (elles seront remplacées si l'organisation les modifie). Le son est propre à ce poste.</p>
+      </div>
+
+      <div data-pane="preview" hidden>
+        <div class="previewwrap"><div class="d-wrap" id="previewRoot"></div></div>
+        <p class="hint">Cliquez « Ouvrir l'affichage », glissez la fenêtre sur la TV, puis cliquez dedans pour passer en plein écran.</p>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="assets/api.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/table.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# Affichage Kumite V2
+Options -Indexes
+<FilesMatch "^(config\.php|config\.sample\.php)$">
+  Require all denied
+</FilesMatch>
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set Referrer-Policy "same-origin"
+</IfModule>

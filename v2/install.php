@@ -17,10 +17,24 @@ try {
             else { meta_set('admin_hash', password_hash($p, PASSWORD_DEFAULT)); $step = 'done'; }
         }
     }
-} catch (RuntimeException $e) {
-    $step = 'error'; $err = "Fichier config.php introuvable. Copiez config.sample.php en config.php et renseignez les accès à la base.";
 } catch (PDOException $e) {
-    $step = 'error'; $err = 'Connexion à la base impossible : ' . htmlspecialchars($e->getMessage());
+    // (PDOException hérite de RuntimeException : il faut la traiter en premier)
+    $step = 'error';
+    $m = $e->getMessage();
+    $hint = '';
+    if (str_contains($m, 'Access denied')) $hint = "Utilisateur ou mot de passe refusé : vérifiez <b>db_user</b> et <b>db_pass</b>, et que cet utilisateur a bien les droits sur la base.";
+    elseif (str_contains($m, 'Unknown database')) $hint = "La base indiquée dans <b>db_name</b> n'existe pas (attention au préfixe ajouté par Infomaniak, ex. <code>abcd_kumite</code>).";
+    elseif (str_contains($m, 'getaddrinfo') || str_contains($m, 'No such file') || str_contains($m, 'Connection refused') || str_contains($m, 'timed out'))
+        $hint = "Serveur de base introuvable : vérifiez <b>db_host</b> (chez Infomaniak, de la forme <code>xxxx.myd.infomaniak.com</code>, pas <code>localhost</code>).";
+    $err = 'Le fichier config.php a bien été trouvé, mais la connexion à la base de données a échoué.<br>' . ($hint ? $hint . '<br>' : '')
+         . '<small>Détail technique : ' . htmlspecialchars($m) . '</small>';
+} catch (RuntimeException $e) {
+    $step = 'error';
+    $dir = __DIR__;
+    $similar = array_map('basename', glob($dir . '/config*') ?: []);
+    $err = "Fichier <b>config.php</b> introuvable dans le dossier <code>" . htmlspecialchars($dir) . "</code>.<br>"
+         . "Fichiers « config… » présents : <b>" . ($similar ? htmlspecialchars(implode(', ', $similar)) : 'aucun') . "</b>.<br>"
+         . "Le fichier doit s'appeler exactement <code>config.php</code> (attention à Windows qui peut cacher l'extension et produire <code>config.php.php</code> ou <code>config.php.txt</code>), et être dans le même dossier que <code>install.php</code>.";
 }
 ?><!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">

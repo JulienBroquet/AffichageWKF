@@ -22,11 +22,12 @@ try {
     $step = 'error';
     $m = $e->getMessage();
     $hint = '';
-    if (str_contains($m, 'Access denied')) $hint = "Utilisateur ou mot de passe refusé : vérifiez <b>db_user</b> et <b>db_pass</b>, et que cet utilisateur a bien les droits sur la base.";
+    if (str_contains($m, 'command denied')) $hint = "La connexion fonctionne, mais l'utilisateur <b>n'a pas tous les droits</b> sur la base. Dans le Manager Infomaniak, donnez-lui les droits complets (lecture, écriture, création, modification de structure) sur cette base, puis rechargez cette page.";
+    elseif (str_contains($m, 'Access denied')) $hint = "Utilisateur ou mot de passe refusé : vérifiez <b>db_user</b> et <b>db_pass</b>, et que cet utilisateur a bien les droits sur la base.";
     elseif (str_contains($m, 'Unknown database')) $hint = "La base indiquée dans <b>db_name</b> n'existe pas (attention au préfixe ajouté par Infomaniak, ex. <code>abcd_kumite</code>).";
     elseif (str_contains($m, 'getaddrinfo') || str_contains($m, 'No such file') || str_contains($m, 'Connection refused') || str_contains($m, 'timed out'))
         $hint = "Serveur de base introuvable : vérifiez <b>db_host</b> (chez Infomaniak, de la forme <code>xxxx.myd.infomaniak.com</code>, pas <code>localhost</code>).";
-    $err = 'Le fichier config.php a bien été trouvé, mais la connexion à la base de données a échoué.<br>' . ($hint ? $hint . '<br>' : '')
+    $err = 'Le fichier config.php a bien été trouvé, mais la base de données a refusé l\'opération.<br>' . ($hint ? $hint . '<br>' : '')
          . '<small>Détail technique : ' . htmlspecialchars($m) . '</small>';
 } catch (RuntimeException $e) {
     $step = 'error';

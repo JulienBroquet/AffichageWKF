@@ -9,6 +9,8 @@ Version en ligne de l'affichage kumite : un **serveur PHP + MySQL** (hébergemen
 - **Page publique** (téléphones des parents et des coachs) : tatamis en direct, pools, classements – nom et club uniquement.
 - **Mode hors ligne** : si Internet coupe, la table continue ; les résultats partent dès le retour du réseau.
 
+> 📘 **Tutoriel illustré pas à pas** (avec captures d'écran) : [docs/TUTORIEL.md](docs/TUTORIEL.md)
+
 ## Rôles et accès
 
 | Rôle | Accès | Peut faire |

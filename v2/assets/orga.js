@@ -14,6 +14,7 @@ const live = {};             // tatami -> { data, updated_ms }
 let editing = null, editingId = null, viewId = null;
 const selected = new Set();
 let rules = clone(DEFAULT_SETTINGS);
+let lastSettingsSig = null;
 
 const poolArr = () => Object.values(pools).map(x => x.data)
   .sort((a, b) => (a.tatami || 99) - (b.tatami || 99) || (a.sort || 0) - (b.sort || 0) || String(a.name).localeCompare(b.name));
@@ -38,7 +39,8 @@ async function sync(){
   catch(err){ if (err.code === 'auth') return handleErr(err); setNet(false); return; }
   setNet(true);
   offset = r.now - Date.now();
-  const tChanged = !tournament || JSON.stringify(tournament) !== JSON.stringify(r.tournament);
+  const tsig = t => JSON.stringify(Object.assign({}, t, { rev: 0 }));
+  const tChanged = !tournament || tsig(tournament) !== tsig(r.tournament);
   tournament = r.tournament;
   if (r.full){ competitors = []; for (const k in pools) delete pools[k]; }
   let compChanged = r.full, poolChanged = r.full;
@@ -99,18 +101,31 @@ function renderTournament(){
   $('brand').textContent = tournament.name;
   $('keyTag').textContent = tournament.key;
   $('pubLink').href = 'public.html#' + tournament.key;
+  $('dipLink').href = 'diplomas.html#' + tournament.key;
   $('archived').hidden = tournament.status === 'active';
   if (document.activeElement !== $('tName')) $('tName').value = tournament.name;
   if (document.activeElement !== $('tPlace')) $('tPlace').value = tournament.place || '';
   if (document.activeElement !== $('tTatamis')) $('tTatamis').value = tournament.tatamis;
-  rules = clone(DEFAULT_SETTINGS);
-  if (tournament.settings) for (const k of ['wkf','k4x15','promo']) Object.assign(rules[k], tournament.settings[k] || {});
-  document.querySelectorAll('[data-set]').forEach(inp => {
-    if (document.activeElement === inp) return;
-    const [a,b] = inp.dataset.set.split('.'); const v = rules[a][b];
-    if (inp.type === 'checkbox') inp.checked = !!v; else inp.value = v;
-  });
-  $('eTatami').innerHTML = '<option value="">– non attribué –</option>' + Array.from({ length: tournament.tatamis }, (_, i) => `<option value="${i+1}">Tatami ${i+1}</option>`).join('');
+  const ssig = JSON.stringify(tournament.settings || {});
+  if (ssig !== lastSettingsSig){   // ne pas écraser des réglages en cours de saisie à chaque synchronisation
+    lastSettingsSig = ssig;
+    rules = clone(DEFAULT_SETTINGS);
+    if (tournament.settings) for (const k of ['wkf','k4x15','promo']) Object.assign(rules[k], tournament.settings[k] || {});
+    const ts = (tournament.settings && tournament.settings.sounds) || {};
+    for (const k of ['atoshi','end','call']) if (ts[k]) rules.sounds[k] = ts[k];
+    Object.assign(rules.sounds.voice, ts.voice || {});
+    renderSounds(); loadSoundFiles();
+    document.querySelectorAll('[data-set]').forEach(inp => {
+      if (document.activeElement === inp) return;
+      const [a,b] = inp.dataset.set.split('.'); const v = rules[a][b];
+      if (inp.type === 'checkbox') inp.checked = !!v; else inp.value = v;
+    });
+  }
+  if ($('eTatami').options.length !== tournament.tatamis + 1){
+    const cur = $('eTatami').value;
+    $('eTatami').innerHTML = '<option value="">– non attribué –</option>' + Array.from({ length: tournament.tatamis }, (_, i) => `<option value="${i+1}">Tatami ${i+1}</option>`).join('');
+    $('eTatami').value = cur;
+  }
   buildMinis();
 }
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
@@ -482,10 +497,95 @@ document.querySelectorAll('[data-set]').forEach(inp => inp.addEventListener('cha
 }));
 $('setSave').addEventListener('click', async () => {
   try {
-    const s = { wkf: rules.wkf, k4x15: rules.k4x15, promo: rules.promo };
-    await Api.call('tournament_update', { settings: s }); await sync();
+    await saveSettings();
     $('setMsg').textContent = 'Règles envoyées aux tables.'; setTimeout(() => $('setMsg').textContent = '', 4000);
   } catch(err){ handleErr(err); }
+});
+
+async function saveSettings(){
+  await Api.call('tournament_update', { settings: { wkf: rules.wkf, k4x15: rules.k4x15, promo: rules.promo, sounds: rules.sounds } });
+  await sync();
+}
+
+/* ------------------------------------------------------------ sons et appel */
+const SOUND_EVENTS = [
+  ['atoshi', 'Atoshi baraku', 'Peu avant la fin du temps'],
+  ['end', 'Fin du temps', 'Quand le chrono arrive à zéro'],
+  ['call', 'Appel des combattants', 'Quand un combat est chargé ou avec 🔔 Appeler'],
+];
+const orgaSoundFiles = {};
+setSoundFileSource(kind => orgaSoundFiles[kind]);
+function syncTestState(){ state.settings.sounds = rules.sounds; state.settings.sound.volume = 0.8; }
+function renderSounds(){
+  $('sndList').innerHTML = SOUND_EVENTS.map(([k, label, help]) => {
+    const c = rules.sounds[k];
+    const opts = Object.entries(SOUND_PRESETS).map(([id, p]) => `<option value="${id}" ${c.src === 'preset' && c.preset === id ? 'selected' : ''}>${esc(p.label)}</option>`).join('');
+    return `<div class="sndrow" data-kind="${k}">
+      <div class="sl"><b>${label}</b><small>${help}</small></div>
+      <select data-snd="sel">${opts}<option value="__file" ${c.src === 'file' ? 'selected' : ''}>Fichier importé${c.src === 'file' && c.name ? ' : ' + esc(c.name) : ''}</option></select>
+      <label class="btn sm">Importer un fichier…<input type="file" accept="audio/*" data-snd="file" hidden></label>
+      <button class="btn sm" data-snd="test">▶ Écouter</button>
+    </div>`;
+  }).join('');
+  const v = rules.sounds.voice;
+  if (document.activeElement !== $('vTpl')) $('vTpl').value = v.template;
+  $('vOn').checked = !!v.on; $('vAuto').checked = !!v.auto; $('vRate').value = v.rate;
+  fillVoices();
+}
+function fillVoices(){
+  const v = rules.sounds.voice, list = frVoices();
+  $('vVoice').innerHTML = '<option value="">Automatique (voix française du PC)</option>' + list.map(x => `<option ${x.name === v.voice ? 'selected' : ''}>${esc(x.name)}</option>`).join('')
+    + (v.voice && !list.some(x => x.name === v.voice) ? `<option selected>${esc(v.voice)}</option>` : '');
+}
+try { speechSynthesis.addEventListener('voiceschanged', fillVoices); } catch(e){}
+async function loadSoundFiles(){
+  const need = SOUND_EVENTS.map(e => e[0]).filter(k => rules.sounds[k].src === 'file' && (!orgaSoundFiles[k] || orgaSoundFiles[k].v !== rules.sounds[k].v));
+  if (!need.length) return;
+  try {
+    const r = await Api.call('doc_get', { keys: need.map(k => 'sound_' + k) });
+    for (const k of need){ const d = r.docs['sound_' + k]; if (d && d.value) orgaSoundFiles[k] = { v: d.version, data: d.value.data, name: d.value.name }; }
+  } catch(e){}
+}
+$('sndList').addEventListener('change', async e => {
+  const row = e.target.closest('[data-kind]'); if (!row) return;
+  const k = row.dataset.kind;
+  if (e.target.dataset.snd === 'sel'){
+    if (e.target.value === '__file'){
+      if (orgaSoundFiles[k]) rules.sounds[k] = { src: 'file', v: orgaSoundFiles[k].v, name: orgaSoundFiles[k].name };
+      else { row.querySelector('[data-snd="file"]').click(); e.target.value = rules.sounds[k].preset || 'bip2'; }
+    } else rules.sounds[k] = { src: 'preset', preset: e.target.value };
+  } else if (e.target.dataset.snd === 'file'){
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    if (f.size > 1024 * 1024){ alert('Fichier trop lourd : 1 Mo maximum. Raccourcissez le son ou exportez-le en MP3.'); return; }
+    const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(f); });
+    try {
+      const test = new Audio(data); await new Promise((ok, ko) => { test.onloadedmetadata = ok; test.onerror = ko; });
+      if (test.duration > 8 && !confirm(`Ce son dure ${Math.round(test.duration)} s. Il sera coupé à 6 s. Continuer ?`)) return;
+    } catch(_){ alert('Ce fichier audio ne peut pas être lu par le navigateur.'); return; }
+    try {
+      const r = await Api.call('doc_save', { key: 'sound_' + k, value: { name: f.name, data } });
+      orgaSoundFiles[k] = { v: r.version, data, name: f.name };
+      rules.sounds[k] = { src: 'file', v: r.version, name: f.name };
+      await saveSettings();
+      toast(`Son « ${f.name} » enregistré et envoyé aux tables.`);
+    } catch(err){ handleErr(err, 'Son non enregistré'); }
+  }
+  renderSounds();
+});
+$('sndList').addEventListener('click', e => {
+  const b = e.target.closest('[data-snd="test"]'); if (!b) return;
+  syncTestState(); playLocal(b.closest('[data-kind]').dataset.kind);
+});
+const readVoice = () => Object.assign(rules.sounds.voice, { template: $('vTpl').value, on: $('vOn').checked, auto: $('vAuto').checked, rate: +$('vRate').value, voice: $('vVoice').value });
+['vTpl','vOn','vAuto','vRate','vVoice'].forEach(id => $(id).addEventListener('change', readVoice));
+$('vTest').addEventListener('click', () => {
+  readVoice(); syncTestState();
+  playCall(announceText(rules.sounds.voice.template, { tatami: 1, tour: 'Demi-finale', pool: 'U12 Filles', aka: 'Léa Muller', aka_club: 'Karaté Club Lausanne', ao: 'Giulia Rossi', ao_club: 'Dojo Genève' }));
+});
+$('sndSave').addEventListener('click', async () => {
+  readVoice();
+  try { await saveSettings(); $('sndMsg').textContent = 'Sons enregistrés et envoyés aux tables.'; setTimeout(() => $('sndMsg').textContent = '', 4000); }
+  catch(err){ handleErr(err); }
 });
 
 /* ------------------------------------------------------------ sauvegarde & exports */
@@ -502,7 +602,8 @@ $('bkLoad').addEventListener('change', async e => {
   const plist = data.pools.map(p => Object.assign({}, p, { current: -1, tatami: isV1 ? null : p.tatami }));
   if (isV1 && data.state && data.state.pool){ const i = plist.findIndex(p => p.id === data.state.pool.id); if (i >= 0) plist[i] = Object.assign({}, data.state.pool, { current: -1, tatami: null }); }
   if (!confirm(`Importer ${data.competitors.length} compétiteurs et ${plist.length} pools (sauvegarde ${isV1 ? 'version 1' : 'version 2'}) ?\n\nLes compétiteurs et pools actuels de ce tournoi seront remplacés.`)) return;
-  try { await Api.call('import', { competitors: data.competitors, pools: plist }); rev = 0; await sync(); toast('Sauvegarde importée.'); }
+  const extra = isV1 ? {} : { docs: data.docs || null, settings: data.tournament && data.tournament.settings || null };
+  try { await Api.call('import', Object.assign({ competitors: data.competitors, pools: plist }, extra)); rev = 0; lastSettingsSig = null; await sync(); toast('Sauvegarde importée.'); }
   catch(err){ handleErr(err, 'Import impossible'); }
 });
 const fmtLabel = p => p.format === 'ko' ? (p.repechage ? 'Élimination directe + repêchage' : 'Élimination directe') : 'Poule';

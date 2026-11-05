@@ -2,7 +2,8 @@
 /* Affichage Kumite V2 – connexion à la base, schéma et fonctions communes */
 declare(strict_types=1);
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
+const SCHEMA_VERSION = '2';
 const KEY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // sans 0/O, 1/I pour éviter les confusions
 
 function app_config(): array {
@@ -120,6 +121,14 @@ function schema_sql(): array {
             created_at DATETIME NOT NULL,
             KEY k_exp (expires_at)
         ) $e",
+        "CREATE TABLE IF NOT EXISTS " . T('docs') . " (
+            tournament_id INT UNSIGNED NOT NULL,
+            k VARCHAR(40) NOT NULL,
+            v MEDIUMTEXT NOT NULL,
+            version INT UNSIGNED NOT NULL DEFAULT 1,
+            updated_at DATETIME NOT NULL,
+            PRIMARY KEY (tournament_id, k)
+        ) $e",
         "CREATE TABLE IF NOT EXISTS " . T('attempts') . " (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             ip VARCHAR(64) NOT NULL,
@@ -131,7 +140,7 @@ function schema_sql(): array {
 
 function install_schema(): void {
     foreach (schema_sql() as $sql) db()->exec($sql);
-    meta_set('schema_version', '1');
+    meta_set('schema_version', SCHEMA_VERSION);
 }
 
 function meta_get(string $k): ?string {

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diplômes – Affichage Kumite</title>
+<link rel="stylesheet" href="assets/app.css">
+<link rel="stylesheet" href="assets/diplomas.css">
+</head>
+<body>
+<div id="screen">
+  <header class="topnav">
+    <span class="brand"><span class="mark" aria-hidden="true"></span><span id="brand">Diplômes</span></span>
+    <span class="spacer"></span>
+    <span class="ok" id="saveState" style="color:#BDF0D3"></span>
+    <a href="#" id="back">Retour à l'organisation</a>
+  </header>
+
+  <div class="dstudio">
+    <aside class="dpanel">
+      <section>
+        <h3>Diplômes à imprimer</h3>
+        <div class="dpools" id="dPools"></div>
+        <label class="checkline"><input type="checkbox" id="dUnfinished"> Inclure les pools pas encore terminés</label>
+        <div class="dkinds">
+          <label class="checkline"><input type="checkbox" data-kind="first" checked> 1re place</label>
+          <label class="checkline"><input type="checkbox" data-kind="second" checked> 2e place</label>
+          <label class="checkline"><input type="checkbox" data-kind="third" checked> 3e place</label>
+          <label class="checkline"><input type="checkbox" data-kind="part" checked> Participation</label>
+        </div>
+        <label>Diplôme de participation pour
+          <select id="dPartFor"><option value="others">les compétiteurs sans médaille</option><option value="all">tous les compétiteurs</option></select>
+        </label>
+        <button class="btn primary" id="dPrint" style="width:100%;padding:12px">Imprimer ou enregistrer en PDF</button>
+        <p class="hint" id="dCount" style="margin:0"></p>
+      </section>
+
+      <section>
+        <h3>Mise en page</h3>
+        <label>Cadre
+          <select data-c="frame"><option value="tatami">Tatami (bandes rouge et bleue)</option><option value="classic">Classique (double filet)</option><option value="plain">Sobre (filet simple)</option></select>
+        </label>
+        <div class="two">
+          <label>Couleur principale<input type="color" data-c="accent"></label>
+          <label>Couleur d'accent<input type="color" data-c="gold"></label>
+        </div>
+        <label>Logo
+          <span class="logorow"><label class="btn sm">Choisir une image…<input type="file" id="dLogo" accept="image/*" hidden></label><button class="btn sm danger" id="dLogoDel">Retirer</button></span>
+        </label>
+        <label>Taille du logo <input type="range" min="12" max="45" step="1" data-c="logoH"></label>
+        <label>Ligne d'en-tête<input data-c="org" placeholder="ex. Karaté Club Delémont"></label>
+        <label class="checkline"><input type="checkbox" data-c="medal"> Médaille avec le rang (1re, 2e, 3e place)</label>
+      </section>
+
+      <section>
+        <h3>Textes</h3>
+        <div class="tabs" id="dTypeTabs">
+          <button data-t="first" class="on">1re</button><button data-t="second">2e</button><button data-t="third">3e</button><button data-t="part">Participation</button>
+        </div>
+        <label>Titre<input data-tt="title"></label>
+        <label>Mention du rang<input data-tt="rank"></label>
+        <label>Phrase<textarea data-tt="text" rows="3"></textarea></label>
+        <label>Avant le nom<input data-c="intro"></label>
+        <label>Pied de page<input data-c="footer"></label>
+        <p class="hint" style="margin:0">Champs : {nom} {club} {pool} {rang} {tournoi} {date} {lieu}</p>
+      </section>
+
+      <section>
+        <h3>Signatures</h3>
+        <div class="two"><label>Nom<input data-sign="0.name"></label><label>Fonction<input data-sign="0.role"></label></div>
+        <div class="two"><label>Nom<input data-sign="1.name"></label><label>Fonction<input data-sign="1.role"></label></div>
+        <p class="hint" style="margin:0">Laissez les deux champs vides pour masquer une signature.</p>
+      </section>
+    </aside>
+
+    <main class="dview">
+      <div class="dpick"><select id="dWho"></select><span class="hint" id="dWhoHint"></span></div>
+      <div class="dsheet" id="dSheet"></div>
+    </main>
+  </div>
+</div>
+<div id="printArea"></div>
+<script src="assets/api.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/diplomas.js"></script>
+</body>
+</html>

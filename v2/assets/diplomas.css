@@ -1,0 +1,65 @@
+/* Studio de diplômes – écran + impression A4 paysage */
+.dstudio{display:grid;grid-template-columns:360px 1fr;min-height:calc(100vh - 56px)}
+.dpanel{background:var(--surface);border-right:1px solid var(--line);overflow:auto;max-height:calc(100vh - 56px);position:sticky;top:0}
+.dpanel section{padding:16px 18px;border-bottom:1px solid #E6EAF0;display:flex;flex-direction:column;gap:10px}
+.dpanel h3{font-size:19px}
+.dpanel label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
+.dpanel input:not([type=checkbox]):not([type=color]):not([type=range]),.dpanel select,.dpanel textarea{padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-ctl);font-size:14px;color:var(--ink);background:var(--surface);font-family:inherit;resize:vertical}
+.dpanel input[type=color]{width:100%;height:36px;border:1px solid var(--line);border-radius:8px;padding:2px;background:var(--surface)}
+.dpanel input[type=range]{accent-color:var(--hinoki)}
+.dpanel .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dpanel .tabs{margin:0;width:100%}
+.dpanel .tabs button{flex:1;padding:6px 8px;font-size:13px}
+.logorow{display:flex;gap:6px}
+.dpools{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto}
+.dpools label{flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-weight:500;font-size:14px;padding:5px 6px;border-radius:7px}
+.dpools label:hover{background:var(--sunk)}
+.dpools label small{color:var(--muted);margin-left:auto;white-space:nowrap}
+.dpools input,.dkinds input{width:17px;height:17px;accent-color:var(--ai)}
+.dkinds{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}
+.dview{padding:22px;min-width:0;display:flex;flex-direction:column;gap:14px;align-items:center}
+.dpick{display:flex;gap:10px;align-items:center;width:100%;max-width:1000px}
+.dpick select{padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-ctl);font-size:14px;max-width:420px;background:var(--surface)}
+.dsheet{width:100%;max-width:1000px;aspect-ratio:297/210;position:relative;box-shadow:0 18px 40px -18px rgba(24,32,51,.45),0 0 0 1px var(--line);background:#fff;overflow:hidden}
+.dsheet .dip{position:absolute;left:0;top:0;transform-origin:0 0}
+@media (max-width:900px){.dstudio{grid-template-columns:1fr}.dpanel{position:static;max-height:none;border-right:0}}
+
+/* ---------- le diplôme (unités réelles) ---------- */
+.dip{width:297mm;height:210mm;position:relative;background:#fff;color:#1a1f2b;font-family:"Archivo",system-ui,sans-serif;overflow:hidden;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;--acc:#1E2B4A;--gold:#C99A55}
+.dip-frame{position:absolute;inset:9mm;pointer-events:none}
+.dip.f-classic .dip-frame{border:1.4mm solid var(--acc);box-shadow:inset 0 0 0 2.2mm #fff,inset 0 0 0 2.6mm var(--gold)}
+.dip.f-plain .dip-frame{border:.5mm solid var(--acc)}
+.dip.f-tatami .dip-frame{inset:0;border:7mm solid #D3263A;box-shadow:inset 0 0 0 4mm #2452D4,inset 0 0 0 4.6mm #fff,inset 0 0 0 5mm var(--gold)}
+.dip-in{position:absolute;inset:20mm 26mm 17mm;display:flex;flex-direction:column;align-items:center;text-align:center}
+.dip-top{display:flex;flex-direction:column;align-items:center;gap:2.5mm;min-height:6mm}
+.dip-top img{display:block;object-fit:contain;max-width:80mm}
+.dip-org{font-size:4.2mm;font-weight:600;letter-spacing:.06em;color:var(--acc)}
+.dip-title{font-stretch:72%;font-weight:850;font-size:21mm;line-height:1;color:var(--acc);margin-top:5mm;letter-spacing:.01em}
+.dip-rank{display:flex;align-items:center;gap:3.5mm;margin-top:3mm;font-size:7mm;font-weight:750;font-stretch:80%;color:var(--gold)}
+.dip-medal{width:13mm;height:13mm;border-radius:50%;display:grid;place-items:center;font-weight:850;font-stretch:72%;font-size:6.5mm;color:#fff;box-shadow:inset 0 0 0 .9mm rgba(255,255,255,.55)}
+.dip-medal.m1{background:#C9A227}.dip-medal.m2{background:#9AA3AF}.dip-medal.m3{background:#B4713D}
+.dip-intro{margin-top:7mm;font-size:4.6mm;color:#5b6475}
+.dip-name{margin-top:2mm;font-weight:850;font-stretch:78%;font-size:17mm;line-height:1.05;color:#141a26;max-width:100%;overflow-wrap:anywhere}
+.dip-name.l2{font-size:13.5mm}.dip-name.l3{font-size:10.5mm}
+.dip-club{margin-top:1.5mm;font-size:5.6mm;font-weight:600;color:#3d4657}
+.dip-rule{width:40mm;height:.6mm;background:var(--gold);margin:6mm 0 5mm}
+.dip-text{font-size:5mm;line-height:1.45;max-width:190mm;color:#2a3140}
+.dip-foot{margin-top:auto;width:100%;display:flex;justify-content:space-between;align-items:flex-end;gap:10mm;text-align:left}
+.dip-place{font-size:4mm;color:#3d4657;line-height:1.5}
+.dip-place b{color:#141a26;font-size:4.4mm}
+.dip-signs{display:flex;gap:14mm}
+.dip-sign{width:58mm;text-align:center;font-size:3.8mm;color:#3d4657}
+.dip-sign .ln{border-top:.35mm solid #8a93a3;padding-top:2mm;margin-top:16mm}
+.dip-sign b{display:block;color:#141a26;font-size:4.2mm}
+
+/* ---------- impression ---------- */
+#printArea{display:none}
+@page{size:A4 landscape;margin:0}
+@media print{
+  html,body{background:#fff!important;height:auto}
+  #screen{display:none!important}
+  #printArea{display:block}
+  #printArea .dip{page-break-after:always;break-after:page}
+  #printArea .dip:last-child{page-break-after:auto;break-after:auto}
+}

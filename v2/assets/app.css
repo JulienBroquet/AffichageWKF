@@ -495,3 +495,19 @@ body.is-display{background:#000;overflow:hidden;cursor:default}
 .d-score,.d-clock,.d-counts b,.d-rank td{font-stretch:66%}
 .err:empty{display:none}
 @media (max-width:560px){.stack .keyinput,.keyinput{font-size:32px}}
+
+/* sons */
+.sndlist{display:flex;flex-direction:column;gap:8px}
+.sndrow{display:grid;grid-template-columns:minmax(170px,1fr) minmax(190px,1.2fr) auto auto;gap:10px;align-items:center;padding:10px 12px;background:var(--sunk);border:1px solid #E3E8EF;border-radius:10px}
+.sndrow .sl b{display:block;font-size:15px}
+.sndrow .sl small{color:var(--muted)}
+.sndrow select{padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-ctl);background:var(--surface)}
+.sndrow .fname{grid-column:2/-1;font-size:12px;color:var(--muted);margin-top:-4px}
+@media (max-width:700px){.sndrow{grid-template-columns:1fr 1fr}.sndrow .sl{grid-column:1/-1}}
+.checkline{flex-direction:row!important;align-items:center;gap:10px!important;color:var(--ink)!important;font-size:14px!important;font-weight:500!important}
+.checkline input{width:18px;height:18px;accent-color:var(--ai)}
+
+.side nav.tabs a{display:flex;align-items:center;gap:10px;color:#C3CDE2;padding:10px 12px;border-radius:9px;font-weight:600;text-decoration:none}
+.side nav.tabs a svg{width:18px;height:18px;flex:none;opacity:.8}
+.side nav.tabs a:hover{background:var(--ai-2);color:#fff}
+@media (max-width:900px){.side nav.tabs a{padding:8px 10px}.side nav.tabs a svg{display:none}}

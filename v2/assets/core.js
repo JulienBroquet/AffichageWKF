@@ -20,7 +20,13 @@ const DEFAULT_SETTINGS = {
   wkf:   { duration:180, atoshi:15, gap:8, autoSenshu:true },
   k4x15: { duration:15,  atoshi:0 },
   promo: { useTimer:false, duration:60, atoshi:0 },
-  sound: { out:'control', volume:0.8 }
+  sound: { out:'control', volume:0.8 },
+  sounds: {
+    atoshi: { src:'preset', preset:'bip2' },
+    end:    { src:'preset', preset:'buzzer' },
+    call:   { src:'preset', preset:'chime' },
+    voice:  { on:true, auto:true, rate:0.95, voice:'', template:'Tatami {tatami}. {tour}. Aka : {aka}, {aka_club}. Ao : {ao}, {ao_club}.' }
+  }
 };
 const clone = o => JSON.parse(JSON.stringify(o));
 const fighter = () => ({ name:'', dojo:'', yuko:0, waza:0, ippon:0, p1:0, p2:0, senshu:false });
@@ -83,16 +89,96 @@ function tone(freq, start, dur, type, vol){
   o.connect(g); g.connect(a.destination);
   o.start(t0); o.stop(t0 + dur + 0.05);
 }
-function playLocal(kind){
+/* ---------- sons : préréglages synthétisés ---------- */
+function env(type, freq, start, dur, peak, opts = {}){
+  const a = audio(); if (!a) return;
+  const t0 = a.currentTime + start;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if (opts.glideTo) o.frequency.exponentialRampToValueAtTime(opts.glideTo, t0 + dur);
+  if (opts.vibrato){ const l = a.createOscillator(), lg = a.createGain(); l.frequency.value = opts.vibrato; lg.gain.value = freq * 0.03; l.connect(lg); lg.connect(o.frequency); l.start(t0); l.stop(t0 + dur + 0.05); }
+  const att = opts.attack ?? 0.01;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t0 + att);
+  if (opts.sustain) g.gain.setValueAtTime(Math.max(0.0002, peak), t0 + dur - 0.05);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+const SOUND_PRESETS = {
+  bip2:    { label:'Double bip',            dur:0.6, play:v => { env('square', 1046, 0, .22, .35*v, {sustain:1}); env('square', 1046, .32, .22, .35*v, {sustain:1}); } },
+  bip3:    { label:'Triple bip aigu',       dur:0.7, play:v => { for (let i = 0; i < 3; i++) env('square', 1318, i*.2, .13, .3*v, {sustain:1}); } },
+  buzzer:  { label:'Sirène (fin de match)', dur:1.6, play:v => { env('sawtooth', 392, 0, 1.6, .45*v, {sustain:1}); env('square', 494, 0, 1.6, .25*v, {sustain:1}); } },
+  horn:    { label:'Corne',                 dur:1.3, play:v => { env('sawtooth', 220, 0, 1.3, .4*v, {sustain:1, attack:.06}); env('sawtooth', 277, 0, 1.3, .25*v, {sustain:1, attack:.06}); } },
+  gong:    { label:'Gong',                  dur:2.5, play:v => { env('sine', 147, 0, 3.2, .7*v, {attack:.005}); env('sine', 233, 0, 2.4, .3*v, {attack:.005}); env('sine', 370, 0, 1.6, .18*v, {attack:.005}); env('triangle', 98, 0, 3.4, .25*v, {attack:.02}); } },
+  bell:    { label:'Ding-dong',             dur:1.6, play:v => { env('sine', 880, 0, 1.1, .5*v); env('sine', 1760, 0, .5, .12*v); env('sine', 698, .55, 1.3, .5*v); env('sine', 1396, .55, .5, .12*v); } },
+  chime:   { label:'Carillon d\'appel',     dur:1.5, play:v => { [523, 659, 784].forEach((f, i) => { env('sine', f, i*.22, 1.2, .45*v); env('sine', f*2, i*.22, .4, .08*v); }); } },
+  whistle: { label:'Sifflet',               dur:0.9, play:v => { env('sine', 2600, 0, .35, .35*v, {sustain:1, vibrato:28}); env('sine', 2600, .45, .45, .35*v, {sustain:1, vibrato:28}); } },
+  none:    { label:'Aucun son',             dur:0,   play:() => {} },
+};
+/* fichiers son importés (data: URL) : fournis par la page via setSoundFileSource */
+let soundFileSource = () => null;
+function setSoundFileSource(fn){ soundFileSource = fn; }
+const soundBuffers = {};
+async function soundBuffer(kind, cfg){
+  const f = soundFileSource(kind);
+  if (!f || !f.data || f.v !== cfg.v) return null;
+  const c = soundBuffers[kind];
+  if (c && c.v === f.v) return c.buffer;
+  const a = audio(); if (!a) return null;
+  try {
+    const bin = atob(f.data.split(',')[1]); const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    const audioBuf = await a.decodeAudioData(buf.buffer);
+    soundBuffers[kind] = { v: f.v, buffer: audioBuf };
+    return audioBuf;
+  } catch(e){ return null; }
+}
+function soundCfg(kind, s = state){
+  const all = (s && s.settings && s.settings.sounds) || DEFAULT_SETTINGS.sounds;
+  return all[kind] || DEFAULT_SETTINGS.sounds[kind];
+}
+/* joue le son d'un évènement ('atoshi', 'end', 'call'). Renvoie la durée approximative (s). */
+async function playLocal(kind, override){
   const v = state.settings.sound.volume;
-  if (v <= 0) return;
-  if (kind === 'atoshi'){
-    tone(1046, 0, 0.22, 'square', 0.35*v);
-    tone(1046, 0.32, 0.22, 'square', 0.35*v);
-  } else {
-    tone(392, 0, 1.6, 'sawtooth', 0.45*v);
-    tone(494, 0, 1.6, 'square', 0.25*v);
+  const cfg = override || soundCfg(kind);
+  if (v <= 0 || !cfg) return 0;
+  if (cfg.src === 'file'){
+    const b = await soundBuffer(kind, cfg);
+    if (b){
+      const a = audio(), src = a.createBufferSource(), g = a.createGain();
+      g.gain.value = v; src.buffer = b; src.connect(g); g.connect(a.destination); src.start();
+      return Math.min(b.duration, 6);
+    }
   }
+  const p = SOUND_PRESETS[cfg.preset] || SOUND_PRESETS[DEFAULT_SETTINGS.sounds[kind] ? DEFAULT_SETTINGS.sounds[kind].preset : 'bip2'];
+  p.play(v);
+  return p.dur;
+}
+
+/* ---------- annonce vocale (synthèse vocale du navigateur) ---------- */
+function frVoices(){ try { return speechSynthesis.getVoices().filter(v => /^fr/i.test(v.lang)); } catch(e){ return []; } }
+function speak(text, vcfg){
+  if (!('speechSynthesis' in window) || !text) return;
+  vcfg = vcfg || soundCfg('voice');
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'fr-FR';
+  const vs = frVoices();
+  const pick = vs.find(v => v.name === vcfg.voice) || vs.find(v => /fr-CH/i.test(v.lang)) || vs.find(v => /fr-FR/i.test(v.lang)) || vs[0];
+  if (pick) u.voice = pick;
+  u.rate = vcfg.rate || 0.95;
+  u.volume = Math.max(0, Math.min(1, state.settings.sound.volume));
+  try { speechSynthesis.cancel(); speechSynthesis.speak(u); } catch(e){}
+}
+function announceText(tpl, data){
+  let t = String(tpl || DEFAULT_SETTINGS.sounds.voice.template).replace(/\{(\w+)\}/g, (_, k) => data[k] ?? '');
+  return t.replace(/,\s*\./g, '.').replace(/\.\s*\./g, '.').replace(/\s+([.,])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+}
+/* appel : son d'appel puis lecture des noms (si activée) */
+async function playCall(text){
+  const d = await playLocal('call');
+  const vc = soundCfg('voice');
+  if (vc.on && text) setTimeout(() => speak(text, vc), Math.round(d * 1000) + 250);
 }
 
 /* =====================================================================

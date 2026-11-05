@@ -167,7 +167,9 @@ try {
     if (!is_array($in)) fail('Requête invalide.', 'bad_json');
     try { app_config(); } catch (RuntimeException $e) { fail("Le serveur n'est pas encore configuré (config.php manquant).", 'not_configured', 503); }
     try { db(); } catch (PDOException $e) { fail('Connexion à la base de données impossible. Vérifiez config.php.', 'db', 503); }
-    if (meta_get('schema_version') === null) fail("La base n'est pas installée. Ouvrez install.php.", 'not_installed', 503);
+    $sv = meta_get('schema_version');
+    if ($sv === null) fail("La base n'est pas installée. Ouvrez install.php.", 'not_installed', 503);
+    if ($sv !== SCHEMA_VERSION) install_schema();   // mise à jour automatique des tables (CREATE IF NOT EXISTS)
 
     $action = (string)($in['action'] ?? '');
     $token = $_SERVER['HTTP_X_KUMITE_TOKEN'] ?? ($in['token'] ?? null);
@@ -269,7 +271,7 @@ try {
         require_role($sess, ['admin']);
         $t = load_tournament(in_int($in, 'id', 0));
         if (normalize_key(in_str($in, 'confirm_key', 20)) !== $t['tkey']) fail('Clé de confirmation incorrecte.', 'bad_input');
-        foreach (['competitors', 'pools', 'live', 'results', 'sessions'] as $tb) db()->prepare("DELETE FROM " . T($tb) . " WHERE tournament_id = ?")->execute([(int)$t['id']]);
+        foreach (['competitors', 'pools', 'live', 'results', 'sessions', 'docs'] as $tb) db()->prepare("DELETE FROM " . T($tb) . " WHERE tournament_id = ?")->execute([(int)$t['id']]);
         db()->prepare("DELETE FROM " . T('tournaments') . " WHERE id = ?")->execute([(int)$t['id']]);
         json_out(['ok' => true]);
     }
@@ -319,6 +321,20 @@ try {
         $r = save_pool($tid, $pool, isset($in['baseVersion']) ? (int)$in['baseVersion'] : null, !empty($in['force']) && $role === 'orga');
         if (!empty($in['results']) && is_array($in['results'])) log_results($tid, $in['results'], $role === 'table' ? $myTatami : (isset($pool['tatami']) ? (int)$pool['tatami'] : null));
         json_out(['ok' => true] + $r);
+    }
+
+    case 'doc_get': {
+        $keys = $in['keys'] ?? [];
+        if (!is_array($keys) || count($keys) > 10) fail('Liste invalide.', 'bad_input');
+        $out = [];
+        $st = db()->prepare("SELECT k, v, version FROM " . T('docs') . " WHERE tournament_id = ? AND k = ?");
+        foreach ($keys as $k) {
+            $k = preg_replace('/[^a-z0-9_]/', '', (string)$k);
+            if ($role === 'table' && !str_starts_with($k, 'sound_')) continue;
+            $st->execute([$tid, $k]);
+            if ($r = $st->fetch()) $out[$k] = ['version' => (int)$r['version'], 'value' => json_decode($r['v'], true)];
+        }
+        json_out(['ok' => true, 'docs' => $out]);
     }
 
     case 'live_push': {
@@ -378,6 +394,24 @@ try {
         json_out(['ok' => true, 'rev' => $rev]);
     }
 
+    case 'doc_save': {
+        require_writable($t);
+        $k = preg_replace('/[^a-z0-9_]/', '', (string)($in['key'] ?? ''));
+        if (!in_array($k, ['diploma', 'sound_atoshi', 'sound_end', 'sound_call'], true)) fail('Document inconnu.', 'bad_input');
+        $json = json_encode($in['value'] ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (strlen($json) > 3_000_000) fail('Fichier trop volumineux (3 Mo maximum).', 'too_large');
+        if (($in['value'] ?? null) === null) {
+            db()->prepare("DELETE FROM " . T('docs') . " WHERE tournament_id = ? AND k = ?")->execute([$tid, $k]);
+            json_out(['ok' => true, 'version' => 0]);
+        }
+        db()->prepare("INSERT INTO " . T('docs') . " (tournament_id, k, v, version, updated_at) VALUES (?,?,?,1,?)
+                       ON DUPLICATE KEY UPDATE v = VALUES(v), version = version + 1, updated_at = VALUES(updated_at)")
+            ->execute([$tid, $k, $json, now_sql()]);
+        $st = db()->prepare("SELECT version FROM " . T('docs') . " WHERE tournament_id = ? AND k = ?");
+        $st->execute([$tid, $k]);
+        json_out(['ok' => true, 'version' => (int)$st->fetchColumn()]);
+    }
+
     case 'history': {
         $st = db()->prepare("SELECT pool_id, pool_name, label, tatami, aka, aka_dojo, ao, ao_dojo, score_aka, score_ao, winner, detail, created_at
                              FROM " . T('results') . " WHERE tournament_id = ? ORDER BY id DESC LIMIT 2000");
@@ -391,7 +425,9 @@ try {
         $st->execute([$tid]);
         json_out(['ok' => true, 'backup' => ['app' => 'affichage-kumite', 'version' => 2, 'date' => gmdate('c'),
             'tournament' => $p['tournament'], 'competitors' => $p['competitors'], 'pools' => array_map(fn($x) => $x['data'], $p['pools']),
-            'results' => $st->fetchAll()]]);
+            'results' => $st->fetchAll(), 'docs' => (function() use ($tid) {
+                $d = db()->prepare("SELECT k, v FROM " . T('docs') . " WHERE tournament_id = ?"); $d->execute([$tid]);
+                $o = []; foreach ($d->fetchAll() as $r) $o[$r['k']] = json_decode($r['v'], true); return (object)$o; })()]]);
     }
 
     case 'import': {
@@ -404,6 +440,14 @@ try {
         $pdo->prepare("UPDATE " . T('pools') . " SET deleted = 1, rev = ?, version = version + 1 WHERE tournament_id = ?")->execute([$rev, $tid]);
         upsert_competitors($tid, $comps);
         foreach ($pools as $pl) if (is_array($pl)) save_pool($tid, $pl, null, true);
+        if (isset($in['docs']) && is_array($in['docs'])) {
+            $ins = $pdo->prepare("INSERT INTO " . T('docs') . " (tournament_id, k, v, version, updated_at) VALUES (?,?,?,1,?)
+                                  ON DUPLICATE KEY UPDATE v = VALUES(v), version = version + 1, updated_at = VALUES(updated_at)");
+            foreach ($in['docs'] as $k => $v) if (in_array($k, ['diploma', 'sound_atoshi', 'sound_end', 'sound_call'], true) && $v !== null)
+                $ins->execute([$tid, $k, json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), now_sql()]);
+        }
+        if (isset($in['settings']) && is_array($in['settings']))
+            $pdo->prepare("UPDATE " . T('tournaments') . " SET settings = ? WHERE id = ?")->execute([json_encode($in['settings'], JSON_UNESCAPED_UNICODE), $tid]);
         $pdo->commit();
         json_out(['ok' => true]);
     }

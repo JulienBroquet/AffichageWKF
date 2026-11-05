@@ -19,6 +19,7 @@
   const STORE = `kumite2.state.${key}.t${tat}`;
   document.title = `Tatami ${tat} – écran`;
   openChannel(`kumite-${key}-t${tat}`);
+  setSoundFileSource(kind => { try { return (JSON.parse(localStorage.getItem(`kumite2.sounds.${key}`)) || {})[kind]; } catch(e){ return null; } });
   try { const s = JSON.parse(localStorage.getItem(STORE)); if (s) state = normalizeState(s); } catch(e){}
   const board = createBoard(document.getElementById('displayRoot'));
   const hint = document.getElementById('dHint');
@@ -29,6 +30,7 @@
     const m = e.data; if (!m) return;
     if (m.type === 'state'){ state = normalizeState(m.state); board.render(); }
     if (m.type === 'sound') playLocal(m.kind);
+    if (m.type === 'call') playCall(m.text);
   };
   window.addEventListener('storage', e => { if (e.key === STORE && e.newValue){ try { state = normalizeState(JSON.parse(e.newValue)); board.render(); } catch(_){} } });
   (function loop(){ board.renderClock(); requestAnimationFrame(loop); })();

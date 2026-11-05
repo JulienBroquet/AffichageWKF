@@ -12,6 +12,9 @@ Api.token = sess.token;
 const STORE_STATE = `kumite2.state.${KEY}.t${TAT}`;
 const STORE_CACHE = `kumite2.cache.${KEY}.t${TAT}`;
 const DISPLAY_URL = `display.html#${KEY}/${TAT}`;
+const STORE_SOUNDS = `kumite2.sounds.${KEY}`;
+const soundFiles = load(STORE_SOUNDS, {});          // kind -> { v, data, name }
+setSoundFileSource(kind => soundFiles[kind]);
 
 /* ---------- état local ---------- */
 state = normalizeState(load(STORE_STATE, null));
@@ -43,6 +46,26 @@ function snapshot(){
 function undo(){
   const h = history.pop(); if (!h) return;
   Object.assign(state, JSON.parse(h)); commit();
+}
+function callText(){
+  const pool = state.pool, m = pool && pool.current >= 0 ? pool.matches[pool.current] : null;
+  return announceText(soundCfg('voice').template, {
+    tatami: TAT, aka: state.aka.name || 'Aka', aka_club: state.aka.dojo || '', ao: state.ao.name || 'Ao', ao_club: state.ao.dojo || '',
+    pool: pool ? pool.name : (state.category || ''), tour: m ? (pool.format === 'ko' ? matchLabel(pool, m).replace(' · ', ', ') : 'Combat ' + (pool.current + 1)) : '' });
+}
+function doCall(){
+  const text = callText(), out = state.settings.sound.out;
+  if (out === 'display') broadcast({ type:'call', text });
+  else playCall(text);
+}
+async function ensureSoundFiles(){
+  const need = ['atoshi', 'end', 'call'].filter(k => { const c = soundCfg(k); return c && c.src === 'file' && (!soundFiles[k] || soundFiles[k].v !== c.v); });
+  if (!need.length) return;
+  try {
+    const r = await Api.call('doc_get', { keys: need.map(k => 'sound_' + k) });
+    for (const k of need){ const d = r.docs['sound_' + k]; if (d && d.value) soundFiles[k] = { v: d.version, data: d.value.data, name: d.value.name }; }
+    try { localStorage.setItem(STORE_SOUNDS, JSON.stringify(soundFiles)); } catch(e){ toast('Sons personnalisés trop volumineux pour être gardés hors ligne sur ce PC.', 5000); }
+  } catch(e){}
 }
 function playSound(kind){
   const out = state.settings.sound.out;
@@ -272,6 +295,8 @@ document.querySelectorAll('[data-set]').forEach(inp => inp.addEventListener('cha
 }));
 $('testAtoshi').addEventListener('click', () => playSound('atoshi'));
 $('testEnd').addEventListener('click', () => playSound('end'));
+$('testCall').addEventListener('click', () => doCall());
+$('flCall').addEventListener('click', () => doCall());
 
 /* ---------- pools du tatami ---------- */
 function nextPool(){
@@ -300,6 +325,7 @@ function loadMatch(i){
   state.timer = { running:false, remaining:totalMs(), endAt:0 }; lastRem = null;
   state.screen = 'callup';
   commit();
+  if (soundCfg('voice').auto) doCall();
 }
 function finishMatch(){
   const pool = state.pool; if (!pool || pool.current < 0) return;
@@ -386,6 +412,7 @@ function renderPool(){
   $('flStart').hidden = pool.current >= 0 || allDone;
   $('flStart').textContent = done ? '▶ Reprendre le pool' : '▶ Lancer le pool';
   $('flHajime').hidden = pool.current < 0 || scr === 'score';
+  $('flCall').hidden = pool.current < 0;
   $('flFinish').hidden = pool.current < 0;
   $('flFinish').textContent = nextUnplayed(pool, pool.current) >= 0 ? 'Terminer le combat ▶ suivant' : 'Terminer le combat ▶ classement';
   const np = allDone ? nextPool() : null;
@@ -480,6 +507,9 @@ function applySettings(ts){
   if (sig === cache.settingsSig) return;
   cache.settingsSig = sig;
   for (const k of ['wkf', 'k4x15', 'promo']) if (ts[k]) state.settings[k] = Object.assign({}, state.settings[k], ts[k]);
+  const ds = clone(DEFAULT_SETTINGS.sounds), ss = ts.sounds || {};
+  state.settings.sounds = { atoshi: ss.atoshi || ds.atoshi, end: ss.end || ds.end, call: ss.call || ds.call, voice: Object.assign(ds.voice, ss.voice || {}) };
+  ensureSoundFiles();
   if (!state.timer.running && (!state.pool || state.pool.current < 0)) state.timer = { running:false, remaining:totalMs(), endAt:0 };
 }
 async function sync(){
@@ -543,5 +573,6 @@ window.addEventListener('beforeunload', e => { if (cache.outbox.length){ e.preve
 if (chan) chan.onmessage = e => { if (e.data && e.data.type === 'hello') broadcast({ type:'state', state }); };
 if (state.timer.running && remainingNow() <= 0){ state.timer.running = false; state.timer.remaining = 0; }
 commit();
+ensureSoundFiles();
 sync();
 })();

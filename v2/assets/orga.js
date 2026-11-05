@@ -96,7 +96,7 @@ async function recomputePools(){
 function renderTournament(){
   if (!tournament) return;
   document.title = `${tournament.name} – Organisation`;
-  $('brand').textContent = '🗂️ ' + tournament.name;
+  $('brand').textContent = tournament.name;
   $('keyTag').textContent = tournament.key;
   $('pubLink').href = 'public.html#' + tournament.key;
   $('archived').hidden = tournament.status === 'active';

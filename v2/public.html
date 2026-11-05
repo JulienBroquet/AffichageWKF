@@ -6,14 +6,15 @@
 <title>Résultats en direct – Affichage Kumite</title>
 <link rel="stylesheet" href="assets/app.css">
 </head>
-<body class="page">
-<header class="topnav">
-  <span class="brand" id="brand">🥋 Résultats en direct</span>
-  <span class="spacer"></span>
-  <span class="net wait" id="net">…</span>
+<body>
+<header class="pubhead">
+  <div class="in">
+    <div class="row"><span class="mark" aria-hidden="true"></span><span class="spacer"></span><span class="net wait" id="net">…</span></div>
+    <h1 id="brand">Résultats en direct</h1>
+    <div class="meta" id="meta"></div>
+  </div>
 </header>
 <main class="pub">
-  <div class="muted" id="meta" style="margin:4px 0 10px"></div>
   <div class="tabs pubtabs">
     <button data-tab="live" class="on">En direct</button>
     <button data-tab="pools">Pools</button>
@@ -56,9 +57,9 @@
       const changed = r.full || r.pools.length;
       rev = r.rev;
       $id('net').className = 'net'; $id('net').textContent = 'En direct';
-      $id('brand').textContent = '🥋 ' + tour.name;
+      $id('brand').textContent = tour.name;
       document.title = tour.name + ' – résultats';
-      $id('meta').textContent = [tour.date ? new Date(tour.date + 'T12:00').toLocaleDateString('fr-CH', { day:'numeric', month:'long', year:'numeric' }) : '', tour.place, tour.status === 'archived' ? 'tournoi terminé (archivé)' : ''].filter(Boolean).join(' · ');
+      $id('meta').textContent = [tour.date ? new Date(tour.date + 'T12:00').toLocaleDateString('fr-CH', { day:'numeric', month:'long', year:'numeric' }) : '', tour.place, tour.status === 'archived' ? 'tournoi terminé (archivé)' : ''].filter(Boolean).join(', ');
       renderLive();
       if (changed){ renderPools(); renderRanks(); }
     } catch(err){
@@ -78,14 +79,15 @@
       const fresh = l && ((Date.now() + offset) - l.updated_ms) < 60000;
       if (!l || !fresh || !l.data || !(l.data.aka && (l.data.aka.name || l.data.ao.name))){
         const next = list().filter(p => +p.tatami === t && poolStatusOf(p) !== 'done')[0];
-        return `<div class="lcard"><div class="lh"><span>Tatami ${t}</span><span class="muted">en attente</span></div>
-          <div class="lf">${next ? 'Prochain pool : <b>' + esc(next.name) + '</b>' : 'Aucun combat en cours'}</div></div>`;
+        return `<div class="lcard idle"><div class="lh"><span>Tatami ${t}</span><span class="muted">pas de combat en cours</span></div>
+          <div class="lf">${next ? 'Prochain pool : <b>' + esc(next.name) + '</b>' : 'Aucun pool en attente'}</div></div>`;
       }
       const d = l.data, A = d.aka, B = d.ao;
       const showTimer = d.mode !== 'promo';
-      const row = (f, side) => `<div class="lrow ${side}"><div><div class="n">${esc(f.name || side.toUpperCase())}${d.winner === side ? ' 🏆' : ''}${f.senshu && d.mode === 'wkf' ? ' <span class="pill" style="background:#fde68a">S</span>' : ''}</div><div class="d">${esc(f.dojo || '')}</div></div><b>${total(f)}</b></div>`;
-      return `<div class="lcard"><div class="lh"><span>Tatami ${t}${d.poolName ? ' · ' + esc(d.poolName) : ''}</span>${showTimer ? `<span class="lclock" data-t="${t}">${fmt(remaining(l))}</span>` : ''}</div>
-        ${row(A, 'aka')}${row(B, 'ao')}<div class="lf">${esc(d.matchLabel || '')}${d.winner ? ' · combat terminé' : ''}</div></div>`;
+      const side = (f, cls, key) => `<div class="${cls}"><span class="n">${esc(f.name || key.toUpperCase())}${d.winner === key ? ' 🏆' : ''}${f.senshu && d.mode === 'wkf' ? ' <span class="pill" style="background:var(--warn);color:#3b2f00">S</span>' : ''}</span><span class="d">${esc(f.dojo || '')}</span><span class="sc">${total(f)}</span></div>`;
+      return `<div class="lcard"><div class="lh"><span>Tatami ${t}${d.poolName ? ' — ' + esc(d.poolName) : ''}</span>${showTimer ? `<span class="lclock" data-t="${t}">${fmt(remaining(l))}</span>` : ''}</div>
+        <div class="duel">${side(A, 'side-a', 'aka')}${side(B, 'side-b', 'ao')}</div>
+        <div class="lf">${esc(d.matchLabel || '')}${d.winner ? (d.matchLabel ? ', ' : '') + 'combat terminé' : ''}</div></div>`;
     }).join('');
   }
   setInterval(() => document.querySelectorAll('.lclock').forEach(el => { const l = live[el.dataset.t]; if (l) el.textContent = fmt(remaining(l)); }), 250);

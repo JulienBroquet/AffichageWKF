@@ -6,71 +6,75 @@
 <title>Organisation – Affichage Kumite</title>
 <link rel="stylesheet" href="assets/app.css">
 </head>
-<body class="page">
-<header class="topnav">
-  <span class="brand" id="brand">Organisation</span>
-  <span class="keytag" id="keyTag" style="background:#2a2e37;color:#fff"></span>
-  <span class="net wait" id="net">Connexion…</span>
-  <span class="spacer"></span>
-  <a href="#" id="pubLink" target="_blank">📱 Page publique</a>
-  <button class="btn sm ghost" id="copyLink" title="Copier le lien à envoyer aux tables de marque">🔗 Lien des tables</button>
-  <button class="btn sm ghost" id="logout">Déconnexion</button>
-</header>
-<div class="pwarn" id="archived" hidden style="margin:10px 16px 0">Ce tournoi est archivé : il est en lecture seule.</div>
-
-<main class="wide">
-  <section class="card">
-    <div class="tabs">
-      <button data-tab="overview" class="on">Vue d'ensemble</button>
-      <button data-tab="comp">Compétiteurs <span id="compCount" class="pill"></span></button>
-      <button data-tab="pool">Pools <span id="poolCount" class="pill"></span></button>
-      <button data-tab="results">Résultats</button>
-      <button data-tab="settings">Paramètres</button>
-      <button data-tab="backup">Sauvegarde &amp; export</button>
+<body>
+<div class="app">
+  <aside class="side">
+    <a class="brandmark" href="index.html"><span class="mark" aria-hidden="true"></span>Affichage Kumite</a>
+    <div class="tinfo">
+      <div class="tn" id="brand">Organisation</div>
+      <div class="row"><span class="keytag" id="keyTag"></span><span class="net wait" id="net">Connexion…</span></div>
     </div>
+    <nav class="tabs" aria-label="Sections">
+      <button data-tab="overview" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Tatamis</button>
+      <button data-tab="comp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16.5 14.6c2.6.2 4.4 1.9 5 5.4"/></svg>Compétiteurs <span id="compCount" class="pill"></span></button>
+      <button data-tab="pool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h6v5H4zM4 14h6v5H4z"/><path d="M10 7.5h4v9h-4M14 12h6"/></svg>Pools <span id="poolCount" class="pill"></span></button>
+      <button data-tab="results"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7"/></svg>Résultats</button>
+      <button data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Paramètres</button>
+      <button data-tab="backup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 17v3h16v-3"/></svg>Sauvegarde et export</button>
+    </nav>
+    <div class="foot">
+      <a href="#" id="pubLink" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>Page publique</a>
+      <button id="copyLink" title="Copier le lien à envoyer aux tables de marque"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>Copier le lien des tables</button>
+      <button id="logout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>Déconnexion</button>
+    </div>
+  </aside>
+
+  <div>
+    <div class="archivebar" id="archived" hidden>Ce tournoi est archivé : il est en lecture seule.</div>
+    <main class="main">
 
     <div data-pane="overview">
-      <h2 style="margin-top:0">Tatamis en direct</h2>
+      <div class="phead"><div><h1>Tatamis</h1><p>Ce qui se passe sur chaque tatami, en direct.</p></div></div>
       <div class="minis" id="minis"></div>
-      <h2>Répartition des pools sur les tatamis</h2>
-      <p class="hint" style="margin-top:-4px">L'ordre détermine l'enchaînement sur chaque tatami. Les tables voient leurs pools apparaître automatiquement.</p>
+      <h2>Ordre des pools par tatami</h2>
+      <p class="hint" style="margin-top:-6px">Chaque table enchaîne ses pools dans cet ordre et les voit apparaître automatiquement.</p>
       <div class="tatcol" id="tatcol"></div>
     </div>
 
     <div data-pane="comp" hidden>
-      <div class="ctools">
-        <label class="btn sm">Importer un CSV…<input type="file" id="csvFile" accept=".csv,.txt,text/csv" hidden></label>
-        <button class="btn sm" id="dlTemplate">Télécharger un modèle CSV</button>
-        <input type="search" id="search" placeholder="Rechercher nom, dojo, grade…">
-        <span class="msg" id="compMsg"></span>
-        <div class="spacer" style="flex:1"></div>
-        <button class="btn sm danger" id="clearList">Vider la liste</button>
+      <div class="phead"><div><h1>Compétiteurs</h1><p>Inscriptions et pesée. Les pools automatiques se mettent à jour à chaque modification.</p></div>
+        <span class="spacer"></span>
+        <label class="btn">Importer un CSV…<input type="file" id="csvFile" accept=".csv,.txt,text/csv" hidden></label>
+        <button class="btn" id="dlTemplate">Modèle CSV</button>
       </div>
-        <form class="addform" id="addForm">
-          <input name="name" placeholder="Nom et prénom" required>
-          <input name="dojo" placeholder="Dojo / club">
-          <select name="sex" title="Sexe"><option value="">Sexe</option><option value="F">F</option><option value="M">M</option></select>
-          <input name="age" class="sm" type="number" min="3" max="99" placeholder="Âge">
-          <input name="weight" class="sm" type="number" min="10" max="200" step="0.1" placeholder="kg">
-          <select name="grade" id="fGrade" title="Grade"></select>
-          <input name="category" class="sm" placeholder="Catégorie">
-          <button class="btn primary sm" id="addBtn">Ajouter</button>
-          <button type="button" class="btn sm" id="cancelEdit" hidden>Annuler</button>
-        </form>
+      <form class="addform" id="addForm">
+        <input name="name" placeholder="Nom et prénom" required>
+        <input name="dojo" placeholder="Dojo / club">
+        <select name="sex" title="Sexe"><option value="">Sexe</option><option value="F">F</option><option value="M">M</option></select>
+        <input name="age" class="sm" type="number" min="3" max="99" placeholder="Âge">
+        <input name="weight" class="sm" type="number" min="10" max="200" step="0.1" placeholder="kg">
+        <select name="grade" id="fGrade" title="Grade"></select>
+        <input name="category" class="sm" placeholder="Catégorie">
+        <button class="btn primary" id="addBtn">Ajouter</button>
+        <button type="button" class="btn" id="cancelEdit" hidden>Annuler</button>
+      </form>
+      <div class="card">
+        <div class="ctools">
+          <input type="search" id="search" placeholder="Rechercher un nom, un club, un grade…">
+          <span class="msg" id="compMsg"></span>
+          <span class="spacer"></span>
+          <button class="btn sm danger" id="clearList">Vider la liste</button>
+        </div>
         <table>
           <thead><tr><th>Nom</th><th>Dojo</th><th>Sexe</th><th>Âge</th><th>Poids</th><th>Grade</th><th>Catégorie</th><th></th></tr></thead>
           <tbody id="compBody"></tbody>
         </table>
-      
+      </div>
     </div>
 
     <div data-pane="pool" hidden>
-      <div class="ctools">
-        <b style="font-size:16px">Pools</b>
-        <span class="hint">Créez les pools, attribuez-les à un tatami ; les tables les lancent le jour J.</span>
-        <div class="spacer" style="flex:1"></div>
-        <button class="btn primary sm" id="pNew">+ Nouveau pool</button>
-      </div>
+      <div class="phead"><div><h1>Pools</h1><p>Créez les pools et attribuez-les à un tatami. Les tables les lancent le jour J.</p></div>
+        <span class="spacer"></span><button class="btn primary" id="pNew">Nouveau pool</button></div>
       <div id="poolWarn"></div>
         <div class="editor" id="poolEditor" hidden>
           <h4 id="eTitle">Nouveau pool</h4>
@@ -120,33 +124,35 @@
         </div>
 
       <div class="pcards" id="poolCards"></div>
-      <div id="poolView" class="card" hidden style="margin-top:10px">
-        <div class="ctools"><b id="pvName" style="font-size:17px"></b><div class="spacer" style="flex:1"></div><button class="btn sm" id="pvClose">Fermer</button></div>
+      <div id="poolView" class="card" hidden>
+        <div class="ctools"><h4 id="pvName" style="margin:0"></h4><span class="spacer"></span><button class="btn sm" id="pvClose">Fermer</button></div>
         <div class="pgrid">
-          <div><h4>Combats</h4><table><thead><tr><th>#</th><th>AKA</th><th style="text-align:center">Score</th><th>AO</th><th></th></tr></thead><tbody id="pvMatches"></tbody></table></div>
+          <div><h4>Combats</h4><table><thead><tr><th>Tour</th><th>AKA</th><th style="text-align:center">Score</th><th>AO</th><th></th></tr></thead><tbody id="pvMatches"></tbody></table></div>
           <div><h4>Classement</h4><table><thead><tr><th>Rg</th><th>Nom</th><th>V</th><th>D</th><th>Pts +</th><th>Pts −</th></tr></thead><tbody id="pvRanking"></tbody></table></div>
         </div>
       </div>
     </div>
 
     <div data-pane="results" hidden>
-      <div class="ctools"><h2 style="margin:0">Classements</h2><div class="spacer" style="flex:1"></div>
-        <button class="btn sm" id="exRank2">📊 Exporter (CSV)</button></div>
+      <div class="phead"><div><h1>Résultats</h1><p>Classements des pools commencés et historique de tous les combats.</p></div>
+        <span class="spacer"></span><button class="btn" id="exRank2">Exporter les classements (CSV)</button></div>
       <div id="rankings" class="plist"></div>
-      <div class="ctools" style="margin-top:18px"><h2 style="margin:0">Historique des combats</h2><div class="spacer" style="flex:1"></div>
-        <button class="btn sm" id="histRefresh">↻ Actualiser</button></div>
-      <table class="tablelist"><thead><tr><th>Heure</th><th>Tatami</th><th>Pool</th><th>Tour</th><th>AKA</th><th style="text-align:center">Score</th><th>AO</th></tr></thead><tbody id="hist"></tbody></table>
+      <div class="ctools" style="margin-top:26px"><h2 style="margin:0">Historique des combats</h2><span class="spacer"></span>
+        <button class="btn sm" id="histRefresh">Actualiser</button></div>
+      <div class="card" style="padding:6px 10px"><table class="tablelist"><thead><tr><th>Heure</th><th>Tatami</th><th>Pool</th><th>Tour</th><th>AKA</th><th style="text-align:center">Score</th><th>AO</th></tr></thead><tbody id="hist"></tbody></table></div>
     </div>
 
     <div data-pane="settings" hidden>
-      <h2 style="margin-top:0">Tournoi</h2>
-      <div class="formgrid">
-        <label>Nom<input id="tName"></label>
-        <label>Lieu<input id="tPlace"></label>
-        <label>Nombre de tatamis<input id="tTatamis" type="number" min="1" max="20"></label>
+      <div class="phead"><div><h1>Paramètres</h1><p>Informations du tournoi et règles de combat appliquées par toutes les tables.</p></div></div>
+      <div class="card">
+        <div class="formgrid">
+          <label>Nom du tournoi<input id="tName"></label>
+          <label>Lieu<input id="tPlace"></label>
+          <label>Nombre de tatamis<input id="tTatamis" type="number" min="1" max="20"></label>
+        </div>
+        <button class="btn primary" id="tSave">Enregistrer</button>
       </div>
-      <button class="btn primary sm" id="tSave">Enregistrer</button>
-      <h2>Règles de combat (pour toutes les tables)</h2>
+      <h2>Règles de combat</h2>
         <div class="settings">
           <fieldset>
             <legend>Mode WKF</legend>
@@ -167,32 +173,35 @@
             <label>Signal avant la fin (s, 0 = aucun) <input type="number" min="0" data-set="promo.atoshi"></label>
           </fieldset>
         </div>
-      <button class="btn primary sm" id="setSave" style="margin-top:10px">Envoyer aux tables</button>
-      <span class="ok" id="setMsg"></span>
+      <div style="margin-top:12px;display:flex;gap:10px;align-items:center"><button class="btn primary" id="setSave">Envoyer les règles aux tables</button><span class="ok" id="setMsg"></span></div>
     </div>
 
     <div data-pane="backup" hidden>
+      <div class="phead"><div><h1>Sauvegarde et export</h1><p>Tout est conservé sur le serveur. Ces fichiers servent d'archive et pour Excel.</p></div></div>
       <div class="settings">
         <fieldset>
           <legend>Sauvegarde complète</legend>
-          <p class="hint">Le serveur conserve tout ; cette copie <b>.json</b> sert d'archive ou de secours (elle peut aussi être restaurée dans la version 1 hors ligne).</p>
+          <p class="hint">Un fichier <b>.json</b> avec les compétiteurs, les pools et tous les résultats. Il peut aussi être ouvert dans la version 1 hors ligne.</p>
           <div class="trow" style="justify-content:flex-start">
-            <button class="btn primary sm" id="bkSave">💾 Télécharger la sauvegarde</button>
-            <label class="btn sm">📂 Importer une sauvegarde (V1 ou V2)…<input type="file" id="bkLoad" accept=".json,application/json" hidden></label>
+            <button class="btn primary sm" id="bkSave">Télécharger la sauvegarde</button>
+            <label class="btn sm">Importer une sauvegarde (V1 ou V2)…<input type="file" id="bkLoad" accept=".json,application/json" hidden></label>
           </div>
         </fieldset>
         <fieldset>
-          <legend>Export des résultats (Excel)</legend>
+          <legend>Export pour Excel</legend>
+          <p class="hint">Fichiers <b>.csv</b> (séparateur « ; »).</p>
           <div class="trow" style="justify-content:flex-start">
-            <button class="btn sm" id="exRank">📊 Classements (CSV)</button>
-            <button class="btn sm" id="exMatches">🥋 Tous les combats (CSV)</button>
-            <button class="btn sm" id="exComp">👥 Compétiteurs (CSV)</button>
+            <button class="btn sm" id="exRank">Classements</button>
+            <button class="btn sm" id="exMatches">Tous les combats</button>
+            <button class="btn sm" id="exComp">Compétiteurs</button>
           </div>
         </fieldset>
       </div>
     </div>
-  </section>
-</main>
+
+    </main>
+  </div>
+</div>
 <script src="assets/api.js"></script>
 <script src="assets/core.js"></script>
 <script src="assets/orga.js"></script>

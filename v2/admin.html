@@ -8,7 +8,7 @@
 </head>
 <body class="page">
 <header class="topnav">
-  <span class="brand">🥋 Administration des tournois</span>
+  <span class="brand"><span class="mark" aria-hidden="true"></span>Administration des tournois</span>
   <span class="spacer"></span>
   <a href="index.html">Accueil</a>
   <button class="btn sm ghost" id="logout" hidden>Déconnexion</button>
@@ -16,7 +16,7 @@
 
 <main class="narrow" id="loginBox">
   <form class="card stack" id="loginForm">
-    <h1>Connexion super-admin</h1>
+    <h1>Administration</h1><p class="muted" style="margin:-6px 0 0">Réservé au responsable des tournois du club.</p>
     <label>Mot de passe<input type="password" id="pw" autocomplete="current-password" required></label>
     <button class="btn primary">Se connecter</button>
     <div class="err" id="loginErr"></div>
@@ -25,10 +25,10 @@
 
 <main class="wide" id="app" hidden>
   <section class="card">
-    <h2 style="margin-top:0">Nouveau tournoi</h2>
+    <h2 style="margin-top:0">Créer un tournoi</h2>
     <form id="createForm">
       <div class="formgrid">
-        <label>Nom<input name="name" required placeholder="Coupe de Noël 2026"></label>
+        <label>Nom<input name="name" required placeholder="ex. Coupe de Noël 2026"></label>
         <label>Date<input name="date" type="date"></label>
         <label>Lieu<input name="place" placeholder="Salle de sport, ville"></label>
         <label>Nombre de tatamis<input name="tatamis" type="number" min="1" max="20" value="2" required></label>

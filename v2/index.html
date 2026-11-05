@@ -6,43 +6,55 @@
 <title>Affichage Kumite – Accueil</title>
 <link rel="stylesheet" href="assets/app.css">
 </head>
-<body class="page">
-<main class="narrow">
-  <div class="card stack">
-    <h1>🥋 Affichage Kumite</h1>
-    <p class="muted" style="margin:0">Entrez la clé du tournoi (8 caractères, ex. <span class="keytag">K7F3-9QX2</span>).</p>
-    <form id="keyForm" class="stack">
-      <input id="key" class="keyinput" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" required>
-      <button class="btn primary">Continuer</button>
-      <div class="err" id="keyErr"></div>
-    </form>
-  </div>
-
-  <div class="card stack" id="tCard" hidden style="margin-top:14px">
-    <div>
-      <h2 style="margin:0" id="tName"></h2>
-      <div class="muted" id="tMeta"></div>
+<body>
+<div class="entry">
+  <header><span class="mark" aria-hidden="true"></span>Affichage Kumite<a href="admin.html">Administration</a></header>
+  <div class="arena">
+    <div class="mat">
+      <form id="keyForm" class="plate stack">
+        <div>
+          <h1>Entrer dans un tournoi</h1>
+          <p>La clé figure sur la convocation ou chez l'organisateur.</p>
+        </div>
+        <input id="key" class="keyinput" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" aria-label="Clé du tournoi" required>
+        <button class="btn primary" style="padding:12px">Continuer</button>
+        <div class="err" id="keyErr" role="alert"></div>
+      </form>
     </div>
-    <div class="roles">
-      <button class="btn" data-role="table">🥋 Table de marque<small>scores d'un tatami</small></button>
-      <button class="btn" data-role="orga">🗂️ Organisation<small>inscriptions, pools</small></button>
-      <a class="btn" id="pubLink" href="#">📱 Résultats en direct<small>public, sans code</small></a>
+
+    <div class="below">
+      <div class="tourcard stack" id="tCard" hidden>
+        <div>
+          <h2 id="tName"></h2>
+          <div class="muted" id="tMeta"></div>
+        </div>
+        <div class="roles">
+          <button class="role" data-role="table">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+            Table de marque<small>Scores et chrono d'un tatami</small></button>
+          <button class="role" data-role="orga">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            Organisation<small>Inscriptions, pools, résultats</small></button>
+          <a class="role" id="pubLink" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+            Résultats en direct<small>Pour le public, sans code</small></a>
+        </div>
+        <form id="loginForm" class="stack" hidden>
+          <label id="tatWrap">Tatami<select id="tatami"></select></label>
+          <label><span id="pinLabel">Code</span><input id="pin" type="password" autocomplete="current-password" required></label>
+          <button class="btn primary" id="loginBtn" style="padding:12px">Se connecter</button>
+          <div class="err" id="loginErr" role="alert"></div>
+        </form>
+      </div>
+
+      <div id="resume" class="tourcard stack resume" hidden>
+        <h4 style="margin:0">Reprendre sur cet appareil</h4>
+        <div id="resumeList" class="stack" style="gap:8px"></div>
+      </div>
     </div>
-    <form id="loginForm" class="stack" hidden>
-      <label id="tatWrap">Tatami<select id="tatami"></select></label>
-      <label><span id="pinLabel">Code</span><input id="pin" type="password" autocomplete="current-password" required></label>
-      <button class="btn primary" id="loginBtn">Se connecter</button>
-      <div class="err" id="loginErr"></div>
-    </form>
   </div>
-
-  <div id="resume" class="card stack" hidden style="margin-top:14px">
-    <b>Sessions ouvertes sur cet appareil</b>
-    <div id="resumeList" class="stack"></div>
-  </div>
-
-  <p class="muted" style="text-align:center;margin-top:24px"><a href="admin.html">Administration des tournois</a></p>
-</main>
+  <footer>Affichage Kumite · tableau de score et gestion de tournois de karaté</footer>
+</div>
 <script src="assets/api.js"></script>
 <script>
 (() => {
@@ -58,7 +70,7 @@
       const r = await Api.call('info', { key: keyIn.value });
       tour = r.tournament;
       $id('tName').textContent = tour.name;
-      $id('tMeta').innerHTML = [tour.date ? new Date(tour.date + 'T12:00').toLocaleDateString('fr-CH', { weekday:'long', day:'numeric', month:'long', year:'numeric' }) : '', tour.place, `${tour.tatamis} tatami${tour.tatamis > 1 ? 's' : ''}`, tour.status === 'archived' ? '<b>archivé (lecture seule)</b>' : ''].filter(Boolean).join(' · ');
+      $id('tMeta').innerHTML = [tour.date ? new Date(tour.date + 'T12:00').toLocaleDateString('fr-CH', { weekday:'long', day:'numeric', month:'long', year:'numeric' }) : '', tour.place, `${tour.tatamis} tatami${tour.tatamis > 1 ? 's' : ''}`, tour.status === 'archived' ? '<b>archivé (lecture seule)</b>' : ''].filter(Boolean).join(', ');
       $id('pubLink').href = 'public.html#' + tour.key;
       $id('tatami').innerHTML = Array.from({ length: tour.tatamis }, (_, i) => `<option value="${i+1}">Tatami ${i+1}</option>`).join('');
       $id('tCard').hidden = false; $id('loginForm').hidden = true;
@@ -68,7 +80,7 @@
 
   document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => {
     role = b.dataset.role;
-    document.querySelectorAll('[data-role]').forEach(x => x.classList.toggle('dark', x === b));
+    document.querySelectorAll('[data-role]').forEach(x => x.classList.toggle('on', x === b));
     $id('tatWrap').hidden = role !== 'table';
     $id('pinLabel').textContent = role === 'table' ? 'Code des tables' : 'Code organisateur';
     $id('loginForm').hidden = false; $id('loginErr').textContent = ''; $id('pin').value = ''; $id('pin').focus();
@@ -87,7 +99,7 @@
   const sessions = Object.entries(Sess.all()).sort((a, b) => b[1].at - a[1].at);
   if (sessions.length){
     $id('resume').hidden = false;
-    $id('resumeList').innerHTML = sessions.map(([sid, s]) => `<div class="prow"><span class="nm"><b>${esc(s.name || s.key)}</b> · ${s.role === 'table' ? 'Table – tatami ' + s.tatami : 'Organisation'} <span class="keytag">${esc(s.key)}</span></span>
+    $id('resumeList').innerHTML = sessions.map(([sid, s]) => `<div class="prow"><span class="nm"><b>${esc(s.name || s.key)}</b> <span class="muted">— ${s.role === 'table' ? 'table du tatami ' + s.tatami : 'organisation'}</span></span><span class="keytag" style="margin-right:auto">${esc(s.key)}</span>
       <a class="btn sm primary" href="${s.role === 'table' ? `table.html#${s.key}/${s.tatami}` : `orga.html#${s.key}`}">Reprendre</a>
       <button class="btn sm danger" data-forget="${esc(sid)}" title="Oublier">✕</button></div>`).join('');
     $id('resumeList').addEventListener('click', e => { const b = e.target.closest('[data-forget]'); if (b){ Sess.set(b.dataset.forget, null); b.closest('.prow').remove(); } });

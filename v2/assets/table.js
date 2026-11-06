@@ -1,4 +1,4 @@
-/* Affichage Kumite V2 – table de marque (un tatami), synchronisée avec le serveur, fonctionne hors ligne */
+/* Hantei – table de marque (un tatami), synchronisée avec le serveur, fonctionne hors ligne */
 'use strict';
 (() => {
 const $ = id => document.getElementById(id);
@@ -20,7 +20,7 @@ setSoundFileSource(kind => soundFiles[kind]);
 state = normalizeState(load(STORE_STATE, null));
 state.tatami = `Tatami ${TAT}`;
 if (state.mode === 'kata' && !state.kata) state.kata = newKata();
-const cache = Object.assign({ rev: 0, tournament: null, pools: {}, outbox: [], settingsSig: '' }, load(STORE_CACHE, {}));
+const cache = Object.assign({ rev: 0, tournament: null, pools: {}, others: {}, outbox: [], settingsSig: '' }, load(STORE_CACHE, {}));
 // cache.pools : { id: { version, data } } – uniquement les pools de ce tatami
 if (state.pool && cache.pools[state.pool.id]) cache.pools[state.pool.id].data = state.pool;   // un seul objet
 else if (state.pool) cache.pools[state.pool.id] = { version: 0, data: state.pool };
@@ -545,6 +545,7 @@ function finishMatch(){
   if (pool.format === 'ko') koRebuild(pool);
   pool.current = pool.matches.indexOf(cur);
   enqueue(pool.id, record);
+  if (pool.stage === 'group' && refreshFinals()) commit();
   const nx = nextUnplayed(pool, pool.current);
   if (nx >= 0) loadMatch(nx);
   else {
@@ -592,9 +593,9 @@ function renderPool(){
     const active = state.pool === p;
     return `<div class="pcard ${active ? 'active' : ''}">
       <div class="pc-top"><b>${esc(p.name)}</b><span class="badge disc-${discOf(p)}">${DISC_SHORT[discOf(p)]}</span><span class="badge">${isKataDisc(p) ? KATA_SHORT[(p.kata || {}).system || 'votes'] : MODES[p.mode]}</span></div>
-      <div class="pc-meta">${unitWord(p, N)} · ${p.format === 'ko' ? (p.repechage ? 'Tableau + repêchage' : 'Tableau') : `Poule, ${M} ${matchWord(p)}`}</div>
+      <div class="pc-meta">${unitText(p, N)} · ${p.format === 'ko' ? (p.repechage ? 'Tableau + repêchage' : 'Tableau') : `Poule, ${M} ${matchWord(p)}`}</div>
       <div class="pc-crit">${esc(critSummary(p))}</div>
-      <div><span class="st ${cls}">${lbl}${status !== 'ready' ? ` ${done}/${M}` : ''}</span></div>
+      <div><span class="st ${cls}">${lbl}${status !== 'ready' ? ` ${done}/${M}` : ''}</span>${p.waiting ? ` <span class="st" style="background:#fff3d6;color:#8a5a00">${esc(waitText(p))}</span>` : ''}</div>
       <div class="pc-acts">${active ? '<span class="st now">Sur le tatami</span>' : `<button class="btn sm dark" data-pact="activate" data-pid="${p.id}" ${N < 2 ? 'disabled' : ''}>▶ Sur le tatami</button>`}</div>
     </div>`;
   }).join('') : `<div class="empty" style="grid-column:1/-1">Aucun pool attribué au tatami ${TAT} pour l'instant. L'organisation les attribue depuis sa page ; ils apparaîtront ici automatiquement.<br>Vous pouvez aussi faire un combat libre en saisissant les noms ci-dessus.</div>`;
@@ -647,6 +648,19 @@ function renderPool(){
     : pool.format === 'ko'
     ? (pool.repechage ? 'Élimination directe avec repêchage WKF.' : 'Élimination directe sans repêchage.')
     : (pool.ranking === 'points' ? 'Classement aux points marqués.' : 'Classement standard : victoires, confrontation directe, points marqués, points encaissés.');
+}
+
+/* ---------- phases finales : remplies dès que toutes les sous-poules sont terminées ---------- */
+function refreshFinals(){
+  const all = Object.values(cache.pools).map(e => e.data).concat(Object.values(cache.others || {}));
+  let any = false;
+  for (const [id, e] of Object.entries(cache.pools)){
+    const p = e.data;
+    if (p.type !== 'final' || hasResults(p) || p.current >= 0) continue;
+    const test = clone(p);
+    if (rebuildPool(test, null, null, all)){ replacePoolData(e, test); enqueue(id); any = true; }
+  }
+  return any;
 }
 
 /* ---------- synchronisation avec le serveur ---------- */
@@ -738,6 +752,8 @@ async function sync(){
     seen.add(p.id);
     const mine = !p.deleted && +p.data.tatami === TAT;
     const entry = cache.pools[p.id];
+    // sous-poules des autres tatamis : gardées pour calculer nos phases finales
+    if (!mine && !p.deleted && p.data.stage === 'group') cache.others[p.id] = p.data; else delete cache.others[p.id];
     if (!mine){
       if (entry && !pendingIds.has(p.id)){
         if (state.pool === entry.data){ state.pool = null; state.screen = 'score'; toast(`Le pool « ${entry.data.name} » a été retiré de ce tatami par l'organisation.`, 6000); }
@@ -763,6 +779,7 @@ async function sync(){
     }
   }
   cache.rev = r.rev;
+  if (refreshFinals()) changed = true;
   if (changed || r.full) commit(); else { saveLocal(); renderNet(); }
   if (cache.outbox.length) flush();
 }

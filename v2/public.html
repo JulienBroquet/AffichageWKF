@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Résultats en direct – Affichage Kumite</title>
+<title>Résultats en direct – Hantei</title>
 <link rel="stylesheet" href="assets/app.css">
 </head>
 <body>
 <header class="pubhead">
   <div class="in">
-    <div class="row"><span class="mark" aria-hidden="true"></span><span class="spacer"></span><span class="net wait" id="net">…</span></div>
+    <div class="row"><span class="mark" aria-hidden="true"></span><span class="brushname" style="font-size:20px">Hantei</span><span class="spacer"></span><span class="net wait" id="net">…</span></div>
     <h1 id="brand">Résultats en direct</h1>
     <div class="meta" id="meta"></div>
   </div>
@@ -26,9 +26,10 @@
     <div class="plist" id="pools"></div>
   </div>
   <div data-pane="ranks" hidden><div class="plist" id="ranks"></div></div>
-  <p class="muted" style="text-align:center;font-size:12px;margin-top:20px">Mise à jour automatique · <a href="index.html">Accueil</a></p>
+  <p class="muted" style="text-align:center;font-size:12px;margin-top:20px">Mise à jour automatique · <a href="index.html">Accueil</a> · <a id="privLink" href="confidentialite.html">Protection des données</a></p>
 </main>
 <script src="assets/api.js"></script>
+<script>document.addEventListener('DOMContentLoaded', () => { const l = document.getElementById('privLink'); if (l) l.href = 'confidentialite.html' + location.hash; });</script>
 <script src="assets/core.js"></script>
 <script>
 (() => {
@@ -127,7 +128,7 @@
     const L = list().filter(p => !q || p.name.toLowerCase().includes(q) || p.participants.some(x => (x.name + ' ' + x.dojo).toLowerCase().includes(q)));
     $id('pools').innerHTML = L.length ? L.map(p => `<details data-pid="${p.id}" ${open.has(p.id) || q ? 'open' : ''}>
       <summary><span>${esc(p.name)} <small class="muted">· ${DISC_SHORT[discOf(p)]} · ${unitWord(p, p.participants.length)}</small></span>${pill(p)}</summary>
-      <div class="muted" style="font-size:12px;margin:6px 0">${esc(DISCIPLINES[discOf(p)])} · ${esc(formatLabel(p))}${isKataDisc(p) ? ' · ' + esc(KATA_SHORT[(p.kata || {}).system || 'votes']) : ''}${p.tatami ? ' · tatami ' + p.tatami : ''}</div>
+      <div class="muted" style="font-size:12px;margin:6px 0">${esc(DISCIPLINES[discOf(p)])} · ${esc(formatLabel(p))}${isKataDisc(p) ? ' · ' + esc(KATA_SHORT[(p.kata || {}).system || 'votes']) : ''}${p.tatami ? ' · tatami ' + p.tatami : ''}${p.waiting ? ' · ' + esc(waitText(p)) : ''}</div>
       ${poolBody(p)}${hasResults(p) ? rankTable(p) : ''}</details>`).join('') : '<div class="card muted">Aucun pool publié pour l\'instant.</div>';
   }
   function renderRanks(){

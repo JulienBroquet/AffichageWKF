@@ -1,4 +1,4 @@
-/* Affichage Kumite V2 – cœur commun (affichage, pools, élimination directe, classements) */
+/* Hantei – cœur commun (affichage, pools, élimination directe, classements) */
 'use strict';
 const MODES = { wkf:'WKF', k4x15:'4 × 15', promo:'Promo', kata:'Kata' };
 const DISCIPLINES = { kumite:'Kumite individuel', kata:'Kata individuel', kata_team:'Kata par équipe', kumite_team:'Kumite par équipe' };
@@ -375,12 +375,19 @@ function roundName(R, r){
   const d = R - 1 - r;
   return ['Finale', 'Demi-finale', 'Quart de finale', '8e de finale', '16e de finale', '32e de finale'][d] || `Tour ${r+1}`;
 }
-function makeDraw(members){
+/* têtes de série valides (présentes dans le pool), dans l'ordre */
+const seedList = (p, members) => (p.seeds || []).filter((id, i, a) => a.indexOf(id) === i && members.some(c => c.id === id));
+/* tirage du tableau : les têtes de série occupent les places 1, 2, 3… (1 et 2 dans des moitiés opposées,
+   3 et 4 dans les autres quarts, etc.) ; les autres sont tirés au sort en évitant les combats entre membres du même club */
+function makeDraw(members, seeds){
   const n = members.length, S = koSize(n), order = seedOrder(S);
+  const fixed = (seeds || []).map(id => members.find(c => c.id === id)).filter(Boolean);
+  const rest = members.filter(c => !fixed.includes(c));
   let best = null, bestScore = Infinity;
   for (let t = 0; t < 400 && bestScore > 0; t++){
-    const a = members.slice();
-    for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    const r = rest.slice();
+    for (let i = r.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; }
+    const a = fixed.concat(r);
     let score = 0;
     for (let k = 0; k < S/2; k++){
       const x = a[order[2*k]-1], y = a[order[2*k+1]-1];
@@ -523,7 +530,7 @@ function bracketHTML(s, pool){
   const box = m => {
     const idx = pool.matches.indexOf(m), w = winnerOf(m), bye = isBye(m);
     if (bye){ const real = m.a === -1 ? m.b : m.a; return `<div class="bm bye"><div class="br ${m.a === -1 ? 'b' : 'a'} w"><span>${nm(real)}</span><i>exempt</i></div></div>`; }
-    const row = (i, side, sc) => `<div class="br ${side} ${m.res && !bye ? (w === i ? 'w' : 'l') : ''} ${bye && i === -1 ? 'l' : ''}"><span>${nm(i)}</span>${m.res && !bye ? `<b>${sc}</b>` : ''}</div>`;
+    const row = (i, side, sc) => `<div class="br ${side} ${m.res && !bye ? (w === i ? 'w' : 'l') : ''} ${bye && i === -1 ? 'l' : ''}"><span>${nm(i)}${i != null && i >= 0 && pool.participants[i] && pool.participants[i].from ? ` <i class="from">${pool.participants[i].from}</i>` : ''}</span>${m.res && !bye ? `<b>${sc}</b>` : ''}</div>`;
     return `<div class="bm ${idx === pool.current ? 'cur' : ''}">${row(m.a, 'a', m.res && !m.res.bye ? fmtPts(m.res.sa) : '')}${row(m.b, 'b', m.res && !m.res.bye ? fmtPts(m.res.sb) : '')}</div>`;
   };
   let cols = '';
@@ -725,7 +732,7 @@ const numOrNull = v => (v === '' || v == null || isNaN(+v)) ? null : +v;
 const YEAR = new Date().getFullYear();
 const compText = c => [c.name, c.dojo, c.category, c.sex, c.age, c.weight, gradeLabel(c.grade)].join(' ').toLowerCase();
 const compInfo = (c, short) => [short ? '' : c.dojo, c.sex, c.age != null && c.age !== '' ? c.age + ' ans' : '', c.weight != null && c.weight !== '' ? c.weight + ' kg' : '', gradeLabel(c.grade)].filter(Boolean).join(' · ');
-const inPool = (c, p) => p.type === 'manual' ? (p.memberIds || []).includes(c.id)
+const inPool = (c, p) => p.type === 'final' ? false : p.type === 'manual' ? (p.memberIds || []).includes(c.id)
   : isTeamDisc(p) ? (!(p.criteria || {}).sex || c.sex === p.criteria.sex) && (!(p.criteria || {}).cat || c.category === p.criteria.cat)
   : matchesCrit(c, p.criteria || {});
 /* « entrants » possibles d'un pool : compétiteurs (individuel) ou équipes du bon type */
@@ -734,17 +741,19 @@ const teamMembers = (t, competitors) => (t.members || []).map(id => competitors.
 const hasResults = p => (p.matches || []).some(m => m.res && !m.res.bye);
 /* Recalcule participants + combats d'un pool à partir de la liste des compétiteurs
    (sans effet si le pool a déjà des résultats ou un combat chargé). Renvoie true si modifié. */
-function rebuildPool(p, competitors, teams){
+function rebuildPool(p, competitors, teams, allPools){
   if (!p.format) p.format = 'rr';
   const team = isTeamDisc(p);
-  if (team && !teams) return false;   // liste des équipes inconnue : on ne touche à rien
   if (!p.matches) p.matches = [];
   if (!p.participants) p.participants = [];
   if (hasResults(p) || p.current >= 0) return false;
+  if (p.type === 'final') return rebuildFinal(p, allPools);
+  if (team && !teams) return false;   // liste des équipes inconnue : on ne touche à rien
   let mem = poolSource(p, competitors, teams).filter(c => inPool(c, p));
   if (p.format === 'ko'){
-    const ids = new Set(mem.map(c => c.id));
-    if (!p.draw || p.draw.length !== mem.length || !p.draw.every(id => ids.has(id))) p.draw = mem.length ? makeDraw(mem) : [];
+    const ids = new Set(mem.map(c => c.id)), seeds = seedList(p, mem);
+    if (!p.draw || p.draw.length !== mem.length || !p.draw.every(id => ids.has(id)) || p.draw.slice(0, seeds.length).join() !== seeds.join())
+      p.draw = mem.length ? makeDraw(mem, seeds) : [];
     mem = p.draw.map(id => mem.find(c => c.id === id));
   }
   const before = JSON.stringify([p.participants, p.sig]);
@@ -759,6 +768,89 @@ function rebuildPool(p, competitors, teams){
   }
   return before !== JSON.stringify([p.participants, p.sig]);
 }
+/* ---------- sous-poules + phase finale ----------
+   Un pool « chacun contre chacun » peut être divisé en sous-poules (A, B, C…). Ce sont des pools normaux (type manuel)
+   avec stage:'group'. Les premiers de chaque sous-poule se retrouvent dans un pool type:'final' (tableau ou poule),
+   rempli automatiquement quand toutes les sous-poules sont terminées. */
+const GROUP_LETTERS = 'ABCDEFGHIJKLMNOP';
+const groupLetter = i => GROUP_LETTERS[i] || String(i + 1);
+/* répartit les membres dans n sous-poules : têtes de série en serpentin (A, B, C, C, B, A…),
+   puis les autres au hasard en équilibrant les effectifs et en séparant au mieux les clubs */
+function splitGroups(members, n, seeds){
+  const G = Array.from({ length: n }, () => []);
+  const fixed = (seeds || []).map(id => members.find(c => c.id === id)).filter(Boolean);
+  fixed.forEach((c, i) => { const r = Math.floor(i / n), k = i % n; G[r % 2 ? n - 1 - k : k].push(c); });
+  const rest = members.filter(c => !fixed.includes(c));
+  for (let i = rest.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+  for (const c of rest){
+    let bi = 0, bs = Infinity;
+    G.forEach((g, i) => { const sc = g.length * 100 + g.filter(x => x.dojo && x.dojo === c.dojo).length * 10 + Math.random(); if (sc < bs){ bs = sc; bi = i; } });
+    G[bi].push(c);
+  }
+  return G.map(g => g.map(c => c.id));
+}
+/* ordre des qualifiés pour le tableau final : 1ers aux places 1..G, puis les 2es placés pour rencontrer
+   leur 1er de sous-poule le plus tard possible (A1 – B2, B1 – A2…) */
+function crossOrder(G, q){
+  const N = G * q, S = koSize(N), order = seedOrder(S), slot = s => order.indexOf(s);
+  const meet = (a, b) => Math.floor(Math.log2(slot(a) ^ slot(b))) + 1;
+  const out = []; for (let g = 0; g < G; g++) out.push([g, 0]);
+  for (let place = 1; place < q; place++){
+    const base = out.length, perm = [...Array(G).keys()];
+    let best = null, bestScore = -1;
+    const tryPerm = (k) => {
+      if (k === G){
+        let sc = 0;
+        for (let i = 0; i < G; i++) for (const [j, [g]] of out.entries()) if (g === perm[i]) sc += meet(base + i + 1, j + 1) * 10 - (place === 1 && j === i ? 0 : 0);
+        if (sc > bestScore){ bestScore = sc; best = perm.slice(); }
+        return;
+      }
+      for (let i = k; i < G; i++){ [perm[k], perm[i]] = [perm[i], perm[k]]; tryPerm(k + 1); [perm[k], perm[i]] = [perm[i], perm[k]]; }
+    };
+    if (G <= 8) tryPerm(0); else best = perm.reverse();
+    best.forEach(g => out.push([g, place]));
+  }
+  return out;
+}
+/* qualifiés d'une phase finale ; ready = toutes les sous-poules sont terminées */
+function finalQualifiers(final, allPools){
+  const byId = {}; (allPools || []).forEach(p => { if (p) byId[p.id] = p; });
+  const groups = (final.groups || []).map(id => byId[id]).filter(g => g && !g.deleted && g.participants);
+  const q = Math.max(1, +final.qualify || 1);
+  const isDone = g => g && realMatches(g).length && poolDone(g);
+  const done = groups.filter(isDone).length;
+  const out = { ready: groups.length > 0 && done === groups.length, done, total: groups.length, list: [] };
+  if (!out.ready) return out;
+  const tables = groups.map(g => poolTable(g).slice().sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99)));
+  const order = final.format === 'ko' ? crossOrder(groups.length, q) : [].concat(...[...Array(q).keys()].map(pl => groups.map((_, gi) => [gi, pl])));
+  for (const [gi, pl] of order){
+    const r = tables[gi][pl]; if (!r) continue;
+    const part = groups[gi].participants[r.i] || {};
+    out.list.push(Object.assign(clone(part), { from: groupLetter(groups[gi].gi ?? gi) + (pl + 1) }));
+  }
+  return out;
+}
+function rebuildFinal(p, allPools){
+  if (!allPools) return false;
+  const Q = finalQualifiers(p, allPools);
+  const before = JSON.stringify([p.participants, p.sig, p.waiting]);
+  p.waiting = Q.ready ? null : { done: Q.done, total: Q.total };
+  const mem = Q.ready ? Q.list : [];
+  const sig = ['final', discOf(p), p.format, p.format === 'ko' && p.repechage ? 1 : 0, ...mem.map(c => c.id)].join('|');
+  p.participants = mem;
+  if (sig !== p.sig){
+    p.sig = sig; p.current = -1;
+    if (mem.length < 2) p.matches = [];
+    else if (p.format === 'ko') koBuild(p);
+    else p.matches = roundRobin(mem.length).map(([a,b]) => ({ a, b, res:null }));
+    return true;
+  }
+  return before !== JSON.stringify([p.participants, p.sig, p.waiting]);
+}
+/* texte d'attente d'une phase finale */
+const unitText = (p, N) => p.type === 'final' && p.waiting ? `${(p.groups || []).length * (+p.qualify || 1)} qualifiés attendus` : unitWord(p, N);
+const waitText = p => p.waiting ? `en attente des sous-poules (${p.waiting.done}/${p.waiting.total} terminée${p.waiting.done > 1 ? 's' : ''})` : '';
+
 function poolStatusOf(p){
   if (poolDone(p) && realMatches(p).length) return 'done';
   if (hasResults(p) || p.current >= 0) return 'live';

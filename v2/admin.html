@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Administration – Affichage Kumite</title>
+<title>Administration – Hantei</title>
 <link rel="stylesheet" href="assets/app.css">
 </head>
 <body class="page">
 <header class="topnav">
-  <span class="brand"><span class="mark" aria-hidden="true"></span>Administration des tournois</span>
+  <span class="brand"><span class="mark" aria-hidden="true"></span><span class="brushname" style="font-size:22px">Hantei</span>&nbsp;· Administration des tournois</span>
   <span class="spacer"></span>
   <a href="index.html">Accueil</a>
   <button class="btn sm ghost" id="logout" hidden>Déconnexion</button>
@@ -34,6 +34,31 @@
         <label>Nombre de tatamis<input name="tatamis" type="number" min="1" max="20" value="2" required></label>
         <label>Code organisateur (4 car. min.)<input name="pin_orga" required minlength="4" autocomplete="off"></label>
         <label>Code des tables (4 car. min.)<input name="pin_table" required minlength="4" autocomplete="off"></label>
+      </div>
+      <div class="privacy">
+        <h3>Protection des données personnelles (RGPD / nLPD)</h3>
+        <p>Ce tournoi va enregistrer, sur la base MySQL du club, des <b>données personnelles</b> sur les compétiteurs : nom et prénom, club, sexe, âge, poids, grade, catégorie, équipes et résultats des combats. Beaucoup de compétiteurs sont <b>mineurs</b>.</p>
+        <ul>
+          <li><b>But</b> : uniquement l'organisation du tournoi (pools, tableaux, affichage sur les tatamis), la publication des résultats et l'impression des diplômes.</li>
+          <li><b>Ce qui est public</b> : la page « Résultats en direct » montre seulement le <b>nom, le club et les résultats</b> (jamais l'âge, le poids ni le grade) à toute personne qui a la clé du tournoi.</li>
+          <li><b>Stockage</b> : sur le serveur du club ; accès protégé par les codes organisateur et tables. Ne partagez ces codes qu'avec les personnes qui en ont besoin.</li>
+          <li><b>Information</b> : les compétiteurs (ou leurs parents pour les mineurs) doivent être informés lors de l'inscription que ces données sont utilisées et que les résultats sont publiés. Un texte prêt à l'emploi est disponible sur la page <a href="confidentialite.html" target="_blank">Protection des données</a>.</li>
+          <li><b>Droits</b> : toute personne peut demander à consulter, corriger ou supprimer ses données au contact ci-dessous. L'organisation peut supprimer un compétiteur, ou toutes les données du tournoi (onglet « Sauvegarde et export »).</li>
+          <li><b>Durée</b> : effacez les données personnelles quand elles ne sont plus utiles (exportez d'abord les résultats si vous voulez garder une trace).</li>
+        </ul>
+        <div class="formgrid">
+          <label>Responsable (club ou personne)<input name="privacy_organizer" placeholder="ex. Karaté Club Lausanne"></label>
+          <label>Contact protection des données *<input name="privacy_contact" required placeholder="ex. info@club.ch"></label>
+          <label>Conservation prévue
+            <select name="privacy_retention">
+              <option value="3 mois">3 mois après le tournoi</option>
+              <option value="6 mois">6 mois après le tournoi</option>
+              <option value="12 mois" selected>12 mois après le tournoi</option>
+              <option value="24 mois">24 mois après le tournoi</option>
+            </select>
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" name="privacy_ok" value="1" required> J'ai lu cet avis. Je confirme que le club informera les participants, qu'il utilisera ces données seulement pour ce tournoi et qu'il les effacera à la fin de la durée de conservation.</label>
       </div>
       <button class="btn primary">Créer le tournoi</button>
       <span class="ok" id="createMsg"></span>

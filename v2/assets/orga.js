@@ -1,4 +1,4 @@
-/* Affichage Kumite V2 – page organisation (inscriptions, pools, répartition sur les tatamis, résultats) */
+/* Hantei – page organisation (inscriptions, pools, répartition sur les tatamis, résultats) */
 'use strict';
 (() => {
 const $ = id => document.getElementById(id);
@@ -68,6 +68,7 @@ async function sync(){
   if (tChanged) renderTournament();
   if (compChanged) renderComp();
   if (poolChanged || compChanged) renderPools();
+  if (poolChanged && poolArr().some(x => x.type === 'final')) refreshFinals().then(() => renderPools());
   renderOverview();
   if (!$('poolView').hidden) renderPoolView();
 }
@@ -94,10 +95,11 @@ async function savePool(id, mutate, opts = {}){
 /* après un changement de compétiteurs : met à jour les pools pas encore commencés */
 async function recomputePools(){
   for (const p of poolArr()){
-    if (hasResults(p) || p.current >= 0) continue;
+    if (hasResults(p) || p.current >= 0 || p.type === 'final') continue;
     const test = clone(p);
     if (rebuildPool(test, competitors, teams)) await savePool(p.id, d => { if (!d || hasResults(d) || d.current >= 0) return null; rebuildPool(d, competitors, teams); return d; });
   }
+  await refreshFinals();
   renderPools(); renderOverview();
 }
 
@@ -377,6 +379,7 @@ $('csvFile').addEventListener('change', async e => {
 });
 
 /* ------------------------------------------------------------ pools */
+const setHasResults = setId => poolArr().some(x => x.setId === setId && (hasResults(x) || x.current >= 0));
 function renderPools(){
   const list = poolArr();
   $('poolCount').textContent = list.length;
@@ -385,14 +388,15 @@ function renderPools(){
     const N = p.participants.length, M = realMatches(p).length, done = realMatches(p).filter(m => m.res).length;
     const s = poolStatusOf(p), [cls, lbl] = st[s];
     return `<div class="pcard ${editingId === p.id ? 'editing' : ''}">
-      <div class="pc-top"><b>${esc(p.name)}</b><span class="badge disc-${discOf(p)}">${DISC_SHORT[discOf(p)]}</span><span class="badge ${p.type}">${p.type === 'auto' ? 'Auto' : 'Manuel'}</span></div>
-      <div class="pc-meta">${p.tatami ? `<b>Tatami ${p.tatami}</b>` : '<span style="color:#b45309">non attribué</span>'} · ${isKataDisc(p) ? esc(KATA_SHORT[(p.kata || {}).system || 'votes']) : MODES[p.mode]} · ${unitWord(p, N)} · ${p.format === 'ko' ? (p.repechage ? 'Tableau + repêchage' : 'Tableau') : `Poule, ${M} ${matchWord(p)}`}</div>
+      <div class="pc-top"><b>${esc(p.name)}</b><span class="badge disc-${discOf(p)}">${DISC_SHORT[discOf(p)]}</span>${p.type === 'final' ? '<span class="badge stage">Phase finale</span>' : p.stage === 'group' ? `<span class="badge stage">Sous-poule ${groupLetter(p.gi)}</span>` : `<span class="badge ${p.type}">${p.type === 'auto' ? 'Auto' : 'Manuel'}</span>`}</div>
+      <div class="pc-meta">${p.tatami ? `<b>Tatami ${p.tatami}</b>` : '<span style="color:#b45309">non attribué</span>'} · ${isKataDisc(p) ? esc(KATA_SHORT[(p.kata || {}).system || 'votes']) : MODES[p.mode]} · ${unitText(p, N)} · ${p.format === 'ko' ? (p.repechage ? 'Tableau + repêchage' : 'Tableau') : `Poule, ${M} ${matchWord(p)}`}</div>
       <div class="pc-crit">${esc(critSummary(p))}</div>
-      <div><span class="st ${cls}">${lbl}${s !== 'ready' ? ` ${done}/${M}` : ''}</span>${N < 2 ? ` <span class="st" style="background:#fee2e2;color:#991b1b">moins de 2 ${isTeamDisc(p) ? 'équipes' : 'compétiteurs'}</span>` : ''}</div>
+      <div><span class="st ${cls}">${lbl}${s !== 'ready' ? ` ${done}/${M}` : ''}</span>${p.type === 'final' && p.waiting ? ` <span class="st" style="background:#fff3d6;color:#8a5a00">${esc(waitText(p))}</span>` : N < 2 ? ` <span class="st" style="background:#fee2e2;color:#991b1b">moins de 2 ${isTeamDisc(p) ? 'équipes' : 'compétiteurs'}</span>` : ''}${(p.seeds || []).length && !p.stage ? ` <span class="st" style="background:#fff3d6;color:#8a5a00">${p.seeds.length} tête${p.seeds.length > 1 ? 's' : ''} de série</span>` : ''}</div>
       <div class="pc-acts">
         <button class="btn sm dark" data-pact="view" data-pid="${p.id}">Voir</button>
         <button class="btn sm" data-pact="edit" data-pid="${p.id}">Modifier</button>
-        <button class="btn sm" data-pact="dup" data-pid="${p.id}">Dupliquer</button>
+        ${p.stage ? '' : `<button class="btn sm" data-pact="dup" data-pid="${p.id}">Dupliquer</button>`}
+        ${p.stage === 'group' && !setHasResults(p.setId) ? `<button class="btn sm" data-pact="regroup" data-pid="${p.id}" title="Nouveau tirage de toutes les sous-poules">Retirage</button>` : ''}
         ${p.format === 'ko' && !hasResults(p) && N >= 2 ? `<button class="btn sm" data-pact="draw" data-pid="${p.id}" title="Nouveau tirage au sort du tableau">Tirage</button>` : ''}
         <button class="btn sm danger" data-pact="del" data-pid="${p.id}" title="Supprimer">✕</button>
       </div></div>`;
@@ -423,14 +427,22 @@ $('poolCards').addEventListener('click', async e => {
   if (act === 'view'){ viewId = p.id; renderPoolView(); $('poolView').scrollIntoView({ behavior:'smooth', block:'nearest' }); }
   else if (act === 'edit') openEditor(p);
   else if (act === 'draw'){
-    await savePool(p.id, d => { if (hasResults(d)) return null; d.draw = makeDraw(poolMembers(d)); d.sig = null; d.current = -1; rebuildPool(d, competitors, teams); return d; });
+    await savePool(p.id, d => { if (hasResults(d)) return null; d.draw = makeDraw(poolMembers(d), seedList(d, poolMembers(d))); d.sig = null; d.current = -1; rebuildPool(d, competitors, teams); return d; });
     renderPools(); renderPoolView();
+  } else if (act === 'regroup'){
+    const set = poolArr().filter(x => x.setId === p.setId && x.stage === 'group').sort((a, b) => a.gi - b.gi);
+    const fin = poolArr().find(x => x.setId === p.setId && x.type === 'final');
+    if (setHasResults(p.setId) || !confirm(`Refaire le tirage des ${set.length} sous-poules de « ${p.setName} » ?`)) return;
+    const members = [].concat(...set.map(g => poolMembers(g)));
+    const assign = splitGroups(members, set.length, (fin && fin.seeds) || []);
+    for (const [i, g] of set.entries()) await savePool(g.id, d => { if (!d || hasResults(d)) return null; d.memberIds = assign[i]; d.seeds = ((fin && fin.seeds) || []).filter(id => assign[i].includes(id)); d.sig = null; rebuildPool(d, competitors, teams); return d; });
+    await refreshFinals(); renderPools(); renderPoolView(); toast('Nouveau tirage des sous-poules effectué.');
   } else if (act === 'dup'){
     const c = Object.assign(clone(p), { id: uid(), name: p.name + ' (copie)', participants: [], matches: [], current: -1, sig: null, draw: null, sort: (p.sort || 0) + 5 });
     rebuildPool(c, competitors, teams);
     if (await savePool(c.id, () => c)){ renderPools(); openEditor(c); }
   } else if (act === 'del'){
-    if (!confirm(`Supprimer le pool « ${p.name} »${hasResults(p) ? ' et ses résultats' : ''} ?`)) return;
+    if (!confirm(`Supprimer le pool « ${p.name} »${hasResults(p) ? ' et ses résultats' : ''} ?${p.stage === 'group' ? '\n\nAttention : la phase finale attend toutes les sous-poules.' : ''}`)) return;
     try { await Api.call('pool_delete', { id: p.id }); delete pools[p.id]; if (editingId === p.id) closeEditor(); if (viewId === p.id){ viewId = null; $('poolView').hidden = true; } renderPools(); renderOverview(); }
     catch(err){ handleErr(err); }
   }
@@ -466,6 +478,9 @@ function openEditor(p){
   editing.discipline = discOf(editing);
   editing.kata = Object.assign({ system:'votes', judges:5, timer: editing.discipline === 'kata_team' }, editing.kata || {});
   editing.bouts = editing.bouts || 3;
+  editing.seeds = (editing.seeds || []).slice();
+  editing.split = { n: 1, qualify: 2, final: 'ko', spread: false };
+  $('eGroups').value = '1'; $('eQualify').value = '2'; $('eFinal').value = 'ko'; $('eSpread').checked = false;
   $('eDisc').value = editing.discipline; $('eKSys').value = editing.kata.system; $('eKJudges').value = editing.kata.judges; $('eKTimer').checked = !!editing.kata.timer;
   $('eBouts').value = editing.bouts;
   selected.clear(); (editing.memberIds || []).forEach(id => selected.add(id));
@@ -478,7 +493,13 @@ function openEditor(p){
   $('eWMin').value = v(k.wMin); $('eWMax').value = v(k.wMax); $('eGMin').value = v(k.gMin); $('eGMax').value = v(k.gMax);
   const locked = !!(p && hasResults(p));
   $('eLocked').hidden = !locked;
-  ['eDisc','eType','eFormat','eRep','eSex','eAgeMin','eAgeMax','eWMin','eWMax','eGMin','eGMax','eTCat'].forEach(id => $(id).disabled = locked);
+  const inSet = !!(p && (p.stage === 'group' || p.type === 'final'));
+  ['eDisc','eType','eFormat','eRep','eSex','eAgeMin','eAgeMax','eWMin','eWMax','eGMin','eGMax','eTCat','eSeedAdd'].forEach(id => $(id).disabled = locked);
+  if (p && p.type === 'final') ['eDisc','eType'].forEach(id => $(id).disabled = true);
+  $('eSetInfo').hidden = !inSet;
+  if (inSet) $('eSetInfo').textContent = p.type === 'final'
+    ? `Phase finale de « ${p.setName} » : elle se remplit toute seule avec les ${p.qualify > 1 ? p.qualify + ' premiers' : '1ers'} de chaque sous-poule quand toutes les sous-poules sont terminées. Vous pouvez changer ici son format, son tatami et son mode.`
+    : `Sous-poule ${groupLetter(p.gi)} de « ${p.setName} ». Les compétiteurs peuvent être déplacés d'une sous-poule à l'autre tant qu'aucun combat n'a eu lieu.`;
   $('poolEditor').hidden = false;
   renderEditor(); renderPools();
   $('poolEditor').scrollIntoView({ behavior:'smooth', block:'nearest' });
@@ -500,6 +521,7 @@ function readEditor(){
   const sexNow = $('eSex').value;
   if (editing.discipline === 'kumite_team' && editing.criteria && sexNow !== editing.criteria.sex && sexNow) $('eBouts').value = sexNow === 'F' ? 3 : 5;
   editing.bouts = Math.max(1, Math.min(7, +$('eBouts').value || 3));
+  editing.split = { n: +$('eGroups').value || 1, qualify: +$('eQualify').value || 2, final: $('eFinal').value, spread: $('eSpread').checked };
   editing.format = $('eFormat').value; editing.repechage = $('eRep').checked; editing.tatami = $('eTatami').value ? +$('eTatami').value : null;
   editing.criteria = { sex:$('eSex').value, ageMin:numOrNull($('eAgeMin').value), ageMax:numOrNull($('eAgeMax').value),
     wMin:numOrNull($('eWMin').value), wMax:numOrNull($('eWMax').value), gMin:numOrNull($('eGMin').value), gMax:numOrNull($('eGMax').value), cat: $('eTCat').value };
@@ -541,18 +563,53 @@ function renderEditor(){
   const noCrit = editing.type === 'auto' && !Object.values(editing.criteria).some(x => x !== '' && x != null);
   const nCombats = editing.format === 'ko' ? `tableau de ${n < 2 ? 0 : koSize(n)}${n >= 2 && koSize(n) > n ? ` (${koSize(n)-n} exempt${koSize(n)-n>1?'s':''})` : ''}` : `${n*(n-1)/2} ${matchWord(editing)}`;
   $('eCount').textContent = `${unitWord(editing, n)} · ${nCombats}` + (noCrit ? (team ? ` – aucun critère : toutes les équipes ${teamKindOf(editing) === 'kata' ? 'Kata' : 'Kumite'} sont incluses` : ' – aucun critère : tous les compétiteurs sont inclus') : '');
+  // ---- sous-poules
+  const isFinal = editing.type === 'final', inSet = editing.stage === 'group' || isFinal;
+  const canSplit = editing.format === 'rr' && !inSet && !(target && hasResults(target));
+  $('eGroupWrap').hidden = !canSplit;
+  if (isFinal){ $('eAuto').hidden = true; $('eManual').hidden = true; }
+  const G = canSplit ? editing.split.n : 1;
+  document.querySelectorAll('#eGroupWrap .gopt').forEach(el => el.hidden = G < 2);
+  if (G > 1){
+    const sz = Math.floor(n / G), big = n % G, per = k => k * (k - 1) / 2;
+    const tot = per(sz) * (G - big) + per(sz + 1) * big, qn = G * editing.split.qualify;
+    $('eGroupHint').innerHTML = n < G * 2 ? `<b style="color:#b91c1c">Il faut au moins ${G * 2} ${isTeamDisc(editing) ? 'équipes' : 'compétiteurs'} pour ${G} sous-poules.</b>`
+      : `${G} sous-poules de ${sz}${big ? ' à ' + (sz + 1) : ''} → ${tot} ${matchWord(editing)} au lieu de ${per(n)}. Puis ${qn} qualifiés en ${editing.split.final === 'rr' ? 'poule finale (' + per(qn) + ' ' + matchWord(editing) + ')' : 'tableau final'}. Les têtes de série sont réparties en serpentin (A, B, C… puis …C, B, A) et les clubs sont séparés autant que possible.`;
+  } else $('eGroupHint').textContent = canSplit ? 'Pour un grand pool, divisez-le en sous-poules : les premiers de chaque sous-poule se retrouvent dans une phase finale.' : '';
+  // ---- têtes de série
+  const seedOn = !isFinal && !(target && hasResults(target)) && (editing.format === 'ko' || G > 1);
+  $('eSeedWrap').hidden = !seedOn;
+  if (seedOn){
+    editing.seeds = seedList(editing, mem);
+    const nm = id => (mem.find(c => c.id === id) || {}).name || '?';
+    const dj = id => (mem.find(c => c.id === id) || {}).dojo || '';
+    $('eSeedList').innerHTML = editing.seeds.map((id, i) => `<li><span class="sp">${esc(nm(id))} <small>${esc(dj(id))}</small></span>
+      <button type="button" class="btn sm" data-seed="up" data-i="${i}" ${i ? '' : 'disabled'} title="Monter">↑</button><button type="button" class="btn sm" data-seed="down" data-i="${i}" ${i < editing.seeds.length - 1 ? '' : 'disabled'} title="Descendre">↓</button><button type="button" class="btn sm danger" data-seed="del" data-i="${i}" title="Retirer">✕</button></li>`).join('');
+    $('eSeedAdd').innerHTML = `<option value="">+ ajouter une tête de série…</option>` + mem.filter(c => !editing.seeds.includes(c.id)).map(c => `<option value="${c.id}">${esc(c.name)}${c.dojo ? ' – ' + esc(c.dojo) : ''}</option>`).join('');
+    $('eSeedHint').textContent = editing.seeds.length ? (G > 1 ? 'Une par sous-poule, dans l\'ordre (serpentin).' : 'Les n° 1 et 2 ne peuvent se rencontrer qu\'en finale, les n° 1 à 4 qu\'en demi-finale…')
+      : 'Les mieux classés, pour qu\'ils ne se rencontrent pas dès les premiers tours.';
+  }
   $('ePreview').innerHTML = mem.map(c => {
     if (team){ const t = teams.find(x => x.id === c.id) || c; return `<span class="chip">${esc(c.name)} <small>${esc([t.dojo, (t.members || []).length + ' m.'].filter(Boolean).join(' · '))}</small></span>`; }
     const full = competitors.find(x => x.id === c.id) || c;
     return `<span class="chip">${esc(c.name)} <small>${esc(compInfo(full, true))}</small></span>`;
   }).join('');
 }
-$('poolEditor').addEventListener('input', e => { if (e.target.dataset.cid || e.target.id === 'eSearch') return; readEditor(); renderEditor(); });
+$('poolEditor').addEventListener('input', e => { if (e.target.dataset.cid || e.target.id === 'eSearch' || e.target.id === 'eSeedAdd') return; readEditor(); renderEditor(); });
 $('poolEditor').addEventListener('change', e => {
+  if (e.target.id === 'eSeedAdd') return;
   if (e.target.dataset.cid){ e.target.checked ? selected.add(e.target.dataset.cid) : selected.delete(e.target.dataset.cid); }
   readEditor(); renderEditor();
 });
 $('eSearch').addEventListener('input', renderEditor);
+$('eSeedAdd').addEventListener('change', e => { if (!editing || !e.target.value) return; editing.seeds.push(e.target.value); renderEditor(); });
+$('eSeedList').addEventListener('click', e => {
+  const b = e.target.closest('[data-seed]'); if (!b || !editing) return;
+  const i = +b.dataset.i, a = editing.seeds;
+  if (b.dataset.seed === 'del') a.splice(i, 1);
+  else { const j = b.dataset.seed === 'up' ? i - 1 : i + 1; if (j >= 0 && j < a.length) [a[i], a[j]] = [a[j], a[i]]; }
+  renderEditor();
+});
 $('eAll').addEventListener('click', () => { $('eChecks').querySelectorAll('[data-cid]').forEach(i => selected.add(i.dataset.cid)); readEditor(); renderEditor(); });
 $('eNone').addEventListener('click', () => { selected.clear(); readEditor(); renderEditor(); });
 $('pNew').addEventListener('click', () => openEditor(null));
@@ -562,17 +619,25 @@ $('eSave').addEventListener('click', async () => {
   const ed = clone(editing);
   const name = ed.name || critSummary(ed) || ($('eCat').value || 'Pool ' + (poolArr().length + 1));
   let ok;
-  if (editingId){
+  const target = editingId && pools[editingId] ? pools[editingId].data : null;
+  if (ed.format === 'rr' && ed.split.n > 1 && ed.stage !== 'group' && ed.type !== 'final' && !(target && hasResults(target))){
+    ok = await createGroupSet(ed, name);
+    if (ok && editingId){ try { await Api.call('pool_delete', { id: editingId }); delete pools[editingId]; } catch(err){ handleErr(err); } }
+  } else if (editingId){
     ok = await savePool(editingId, d => {
       if (!d) return null;
       const tatChanged = +d.tatami !== +ed.tatami;
-      Object.assign(d, { name, mode: ed.mode, ranking: ed.ranking, tatami: ed.tatami, kata: ed.kata, bouts: ed.bouts });
+      Object.assign(d, { name, mode: ed.mode, ranking: ed.ranking, tatami: ed.tatami, kata: ed.kata, bouts: ed.bouts, seeds: ed.seeds });
       if (tatChanged) d.sort = Math.max(0, ...poolArr().filter(x => +x.tatami === +ed.tatami).map(x => x.sort || 0)) + 10;
-      if (!hasResults(d)){ Object.assign(d, { discipline: ed.discipline, type: ed.type, criteria: ed.criteria, memberIds: ed.memberIds, format: ed.format, repechage: ed.repechage }); rebuildPool(d, competitors, teams); }
+      if (!hasResults(d)){
+        if (d.type === 'final') Object.assign(d, { format: ed.format, repechage: ed.repechage });
+        else Object.assign(d, { discipline: ed.discipline, type: ed.type, criteria: ed.criteria, memberIds: ed.memberIds, format: ed.format, repechage: ed.repechage });
+        d.sig = null; rebuildPool(d, competitors, teams, poolArr());
+      }
       return d;
     });
   } else {
-    const p = { id: uid(), name, discipline: ed.discipline, kata: ed.kata, bouts: ed.bouts, type: ed.type, mode: ed.mode, ranking: ed.ranking, criteria: ed.criteria, format: ed.format, repechage: ed.repechage,
+    const p = { id: uid(), name, discipline: ed.discipline, kata: ed.kata, bouts: ed.bouts, seeds: ed.seeds, type: ed.type, mode: ed.mode, ranking: ed.ranking, criteria: ed.criteria, format: ed.format, repechage: ed.repechage,
       memberIds: ed.memberIds, tatami: ed.tatami, sort: Math.max(0, ...poolArr().filter(x => +x.tatami === +ed.tatami).map(x => x.sort || 0)) + 10,
       participants: [], matches: [], current: -1 };
     rebuildPool(p, competitors, teams);
@@ -580,6 +645,40 @@ $('eSave').addEventListener('click', async () => {
   }
   if (ok){ editing = null; editingId = null; $('poolEditor').hidden = true; renderPools(); renderOverview(); renderPoolView(); }
 });
+
+/* création d'un pool divisé en sous-poules + sa phase finale */
+async function createGroupSet(ed, name){
+  const members = poolMembers(ed), G = ed.split.n;
+  if (members.length < G * 2){ alert(`Il faut au moins ${G * 2} ${isTeamDisc(ed) ? 'équipes' : 'compétiteurs'} pour ${G} sous-poules.`); return false; }
+  const assign = splitGroups(members, G, seedList(ed, members));
+  const setId = uid(), T = tournament ? +tournament.tatamis : 1;
+  const base = Math.max(0, ...poolArr().filter(x => +x.tatami === +ed.tatami).map(x => x.sort || 0)) + 10;
+  const common = { discipline: ed.discipline, kata: ed.kata, bouts: ed.bouts, mode: ed.mode, ranking: ed.ranking, setId, setName: name, participants: [], matches: [], current: -1 };
+  const groups = assign.map((ids, gi) => Object.assign(clone(common), {
+    id: uid(), name: `${name} – Poule ${groupLetter(gi)}`, stage: 'group', gi, type: 'manual', memberIds: ids, format: 'rr', criteria: {},
+    seeds: (ed.seeds || []).filter(id => ids.includes(id)),
+    tatami: ed.split.spread && ed.tatami ? ((+ed.tatami - 1 + gi) % T) + 1 : ed.tatami, sort: base + gi }));
+  const final = Object.assign(clone(common), { id: uid(), name: `${name} – Phase finale`, stage: 'final', type: 'final', groups: groups.map(g => g.id),
+    qualify: ed.split.qualify, format: ed.split.final === 'rr' ? 'rr' : 'ko', repechage: ed.split.final === 'korep', seeds: ed.seeds || [],
+    tatami: ed.tatami, sort: base + G + 1 });
+  const all = poolArr().concat(groups, [final]);
+  for (const g of groups) rebuildPool(g, competitors, teams, all);
+  rebuildPool(final, competitors, teams, all);
+  for (const d of groups.concat([final])) if (!(await savePool(d.id, () => d))) return false;
+  toast(`${G} sous-poules et la phase finale ont été créées.`);
+  return true;
+}
+/* met à jour les phases finales (quand les sous-poules se terminent ou changent) */
+let refreshingFinals = false;
+async function refreshFinals(){
+  if (refreshingFinals) return; refreshingFinals = true;
+  try {
+    for (const p of poolArr().filter(x => x.type === 'final' && !hasResults(x) && x.current < 0)){
+      const test = clone(p);
+      if (rebuildPool(test, competitors, teams, poolArr())) await savePool(p.id, d => { if (!d || hasResults(d) || d.current >= 0) return null; rebuildPool(d, competitors, teams, poolArr()); return d; });
+    }
+  } finally { refreshingFinals = false; }
+}
 
 /* ------------------------------------------------------------ résultats */
 function renderRankings(){
@@ -765,4 +864,27 @@ $('exComp').addEventListener('click', () => {
 sync();
 setInterval(sync, 2500);
 setInterval(() => { for (const m of minis){ m.cache.s = liveState(m.t); } }, 1000);
+
+/* ------------------------------------------------------------ RGPD : suppression des données */
+(async () => {
+  try {
+    const r = await Api.call('info', { key: KEY });
+    const pv = r.privacy;
+    $('privLink').href = 'confidentialite.html#' + KEY;
+    $('privInfo').innerHTML = pv ? `Avis accepté le ${esc((pv.accepted_at || '').slice(0, 10).split('-').reverse().join('.'))}${pv.organizer ? ' · responsable : <b>' + esc(pv.organizer) + '</b>' : ''} · contact : <b>${esc(pv.contact)}</b>${pv.retention ? ' · conservation prévue : <b>' + esc(pv.retention) + '</b> après le tournoi' : ''}.`
+      : "Ce tournoi a été créé avant l'avis de protection des données : pensez à informer les participants et à effacer les données après le tournoi.";
+  } catch(e){}
+})();
+$('purgeBtn').addEventListener('click', async () => {
+  const all = $('purgeAll').checked, k = $('purgeKey').value.trim().toUpperCase();
+  if (k.replace(/[^A-Z0-9]/g, '') !== KEY.replace(/[^A-Z0-9]/g, '')){ alert('Tapez exactement la clé du tournoi (' + KEY + ') pour confirmer.'); $('purgeKey').focus(); return; }
+  if (!confirm(all ? `Supprimer DÉFINITIVEMENT le tournoi ${KEY} et toutes ses données ?` : `Supprimer DÉFINITIVEMENT les compétiteurs, équipes, pools et résultats du tournoi ${KEY} ?`)) return;
+  try {
+    await Api.call('tournament_purge', { confirm_key: k, mode: all ? 'all' : 'data' });
+    if (all){ alert('Le tournoi a été supprimé.'); Sess.set(SID, null); location.href = 'index.html'; return; }
+    toast('Données personnelles supprimées.');
+    $('purgeKey').value = '';
+    await sync();
+  } catch(err){ handleErr(err, 'Suppression impossible'); }
+});
 })();

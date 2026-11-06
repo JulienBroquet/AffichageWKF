@@ -1,6 +1,6 @@
 # Affichage WKF – tableau de score pour compétitions de karaté (kumite)
 
-> **Version 2 (réseau, plusieurs tatamis, PHP + MySQL)** : voir le dossier [`v2/`](v2/README.md) et le [tutoriel illustré](v2/docs/TUTORIEL.md).
+> **Hantei 判定 – version 2 (réseau, plusieurs tatamis, PHP + MySQL)** : voir le dossier [`v2/`](v2/README.md) et le [tutoriel illustré](v2/docs/TUTORIEL.md).
 > La version 1 ci-dessous reste la version autonome, hors ligne, en un seul fichier.
 
 Application de tableau de score et de gestion de compétition, en **un seul fichier HTML** (`affichage-kumite.html`).

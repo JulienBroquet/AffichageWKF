@@ -1,6 +1,6 @@
 <?php
 /*
- * Affichage Kumite V2 – configuration
+ * Hantei – configuration
  * 1. Copiez ce fichier sous le nom  config.php
  * 2. Renseignez les accès à la base MySQL / MariaDB (Manager Infomaniak → Bases de données)
  * 3. Ouvrez  https://votre-sous-domaine/install.php  pour créer les tables et le mot de passe super-admin

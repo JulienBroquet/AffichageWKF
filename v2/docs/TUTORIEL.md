@@ -1,6 +1,6 @@
-# Tutoriel illustré – Affichage Kumite V2
+# Tutoriel illustré – Hantei
 
-Ce guide suit un tournoi de démonstration du début à la fin : la **Coupe de Noël 2026**, sur 2 tatamis, avec 16 compétiteurs fictifs. Toutes les images sont de vraies captures de l'application.
+**Hantei** (判定, « la décision » en japonais) est l'application de tableau de score et de gestion de tournois de karaté du club (anciennement « Affichage Kumite »). Ce guide suit un tournoi de démonstration du début à la fin : la **Coupe de Noël 2026**, sur 2 tatamis, avec 16 compétiteurs fictifs. Toutes les images sont de vraies captures de l'application.
 
 **Sommaire**
 
@@ -56,6 +56,19 @@ Ouvrez `admin.html` et entrez le mot de passe super-admin.
 Dans **Créer un tournoi**, remplissez le nom, la date, le lieu, le **nombre de tatamis**, puis les deux codes : **code organisateur** et **code des tables** (4 caractères minimum).
 
 ![Formulaire de création d'un tournoi](img/04-admin-creer-tournoi.png)
+
+**Protection des données (RGPD / nLPD).** Un tournoi enregistre des données personnelles, souvent sur des mineurs : nom, club, sexe, âge, poids et grade. Avant de créer le tournoi, il faut :
+
+1. lire l'avis affiché sous le formulaire ;
+2. indiquer le **responsable** (le club) et un **contact** pour les questions sur les données (obligatoire) ;
+3. choisir la **durée de conservation** ;
+4. cocher la case de confirmation.
+
+Sans cette case, le tournoi n'est pas créé.
+
+![Avis de protection des données à accepter](img/48-admin-rgpd.png)
+
+La page **Protection des données** (lien en bas de l'accueil et de la page publique) explique aux participants quelles données sont utilisées et à qui écrire. Elle propose aussi un **texte prêt à copier** pour votre formulaire d'inscription, déjà complété avec le nom du tournoi, le club et le contact.
 
 Cliquez **Créer le tournoi** : la **clé** s'affiche et le tournoi apparaît dans la liste.
 
@@ -144,6 +157,31 @@ Sur chaque carte :
 - **✕** supprime le pool.
 
 Des **alertes** orange signalent les compétiteurs sans pool, ceux qui sont dans plusieurs pools, et les pools sans tatami.
+
+#### Têtes de série
+
+Pour un **tableau** (élimination directe) ou des **sous-poules**, vous pouvez désigner des **têtes de série** avant le tirage : dans le formulaire du pool, choisissez-les dans la liste **« + ajouter une tête de série… »**, dans l'ordre (n° 1 = le mieux classé). Les flèches ↑ ↓ changent l'ordre, ✕ en retire une.
+
+- **Tableau** : la n° 1 et la n° 2 sont placées dans deux moitiés opposées (elles ne peuvent se rencontrer qu'en finale), les n° 3 et 4 dans les deux autres quarts (pas avant les demi-finales), etc. Les autres compétiteurs sont tirés au sort autour, en évitant que deux membres du même club se rencontrent au premier tour. **Tirage** refait le tirage en gardant les têtes de série à leur place.
+- **Sous-poules** : les têtes de série sont réparties en serpentin (n° 1 en A, n° 2 en B, n° 3 en C, n° 4 en D, n° 5 de nouveau en D, etc.), pour qu'elles ne se retrouvent pas dans la même sous-poule.
+
+#### Diviser une poule en sous-poules
+
+Une poule de 16 compétiteurs « chacun contre chacun » demande 120 combats. Pour un pool au format **Poule**, choisissez **Sous-poules** (2 à 8), le nombre de **qualifiés** par sous-poule (le 1er, ou les 2 premiers) et la **phase finale** entre les qualifiés : tableau, tableau avec repêchage, ou poule. L'éditeur affiche le nombre de combats obtenu ; 4 sous-poules de 4 font par exemple 24 combats au lieu de 120.
+
+![Sous-poules et têtes de série dans l'éditeur de pool](img/49-orga-sous-poules-tetes-de-serie.png)
+
+À l'enregistrement, Hantei crée **un pool par sous-poule** (« U18 M – Poule A », « Poule B »…) et un pool **« Phase finale »**. Les compétiteurs sont répartis en équilibrant les effectifs et en séparant les clubs autant que possible. **Retirage** refait la répartition tant qu'aucun combat n'a eu lieu, et **Modifier** permet de déplacer quelqu'un d'une sous-poule à l'autre.
+
+Avec **Répartir les sous-poules sur tous les tatamis**, les sous-poules sont disputées en même temps sur plusieurs tatamis.
+
+![Les sous-poules et la phase finale](img/50-orga-pools-sous-poules.png)
+
+La phase finale reste **en attente** tant que toutes les sous-poules ne sont pas terminées. Dès que la dernière se termine, sur n'importe quel tatami, elle se remplit **toute seule** avec les qualifiés. Dans un tableau, les croisements sont faits pour que deux qualifiés de la même sous-poule ne se retrouvent pas avant la finale (A1 – C2, D1 – B2…). Le tableau indique d'où vient chaque qualifié.
+
+![Le tableau de la phase finale sur l'écran TV](img/51-tv-phase-finale.png)
+
+Les médailles et les diplômes de 1re, 2e et 3e place sont donnés à la **phase finale**. Les compétiteurs éliminés en sous-poule reçoivent un diplôme de participation.
 
 ### 5.3 Ordonner les pools sur chaque tatami
 
@@ -416,6 +454,16 @@ Résultat : une page A4 paysage par diplôme.
 
 - Téléchargez une **sauvegarde** et les **exports CSV** (section 9).
 - Le super-admin **archive** le tournoi (`admin.html` → **Archiver**) : il passe en lecture seule, mais l'organisation et la page publique restent consultables. **Réactiver** le rouvre si besoin.
+- **Effacez les données personnelles** à la fin de la durée de conservation choisie à la création (RGPD / nLPD).
+  - **Où :** **Sauvegarde et export → Protection des données**.
+  - **Comment :** tapez la clé du tournoi pour confirmer, puis cliquez **Supprimer toutes les données**.
+  - **Ce qui est effacé :** les compétiteurs, les équipes, les pools, les résultats et l'historique des combats.
+  - **Ce qui est gardé :** le nom du tournoi, sa clé, les règles et les sons.
+  - **Variante :** cochez **Supprimer aussi le tournoi lui-même** pour tout effacer ; la clé ne fonctionnera plus.
+  - **Attention :** c'est définitif. Téléchargez d'abord la sauvegarde ou les classements si vous voulez garder une trace.
+- Quand une personne demande la suppression de ses données, supprimez simplement son compétiteur (✕) : sa fiche est vidée sur le serveur.
+
+![Supprimer les données du tournoi](img/52-orga-rgpd.png)
 
 ---
 

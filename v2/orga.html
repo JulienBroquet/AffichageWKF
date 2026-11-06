@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Organisation – Affichage Kumite</title>
+<title>Organisation – Hantei</title>
 <link rel="stylesheet" href="assets/app.css">
 </head>
 <body>
 <div class="app">
   <aside class="side">
-    <a class="brandmark" href="index.html"><span class="mark" aria-hidden="true"></span>Affichage Kumite</a>
+    <a class="brandmark" href="index.html"><span class="mark" aria-hidden="true"></span><span class="brushname">Hantei</span></a>
     <div class="tinfo">
       <div class="tn" id="brand">Organisation</div>
       <div class="row"><span class="keytag" id="keyTag"></span><span class="net wait" id="net">Connexion…</span></div>
@@ -173,6 +173,30 @@
           </div>
           <div><b id="eCount"></b></div>
           <div class="chips" id="ePreview"></div>
+          <div class="hint setinfo" id="eSetInfo" hidden></div>
+          <div class="subbox" id="eGroupWrap">
+            <div class="egrid">
+              <label>Sous-poules
+                <select id="eGroups"><option value="1">Non : une seule poule</option><option value="2">2 sous-poules</option><option value="3">3 sous-poules</option><option value="4">4 sous-poules</option><option value="5">5 sous-poules</option><option value="6">6 sous-poules</option><option value="8">8 sous-poules</option></select>
+              </label>
+              <label class="gopt">Qualifiés par sous-poule
+                <select id="eQualify"><option value="1">Le 1er</option><option value="2" selected>Les 2 premiers</option></select>
+              </label>
+              <label class="gopt">Phase finale entre les qualifiés
+                <select id="eFinal"><option value="ko">Tableau (élimination directe)</option><option value="korep">Tableau + repêchage</option><option value="rr">Poule (chacun contre chacun)</option></select>
+              </label>
+              <label class="gopt" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-size:14px"><input type="checkbox" id="eSpread"> Répartir les sous-poules sur tous les tatamis</label>
+            </div>
+            <p class="hint" id="eGroupHint" style="margin:6px 0 0"></p>
+          </div>
+          <div class="subbox" id="eSeedWrap">
+            <div class="ctools" style="margin:0">
+              <b>Têtes de série</b>
+              <select id="eSeedAdd"></select>
+              <span class="hint" id="eSeedHint" style="margin:0"></span>
+            </div>
+            <ol class="seedlist" id="eSeedList"></ol>
+          </div>
           <div class="trow" style="justify-content:flex-start">
             <button class="btn primary" id="eSave">Enregistrer le pool</button>
             <button class="btn" id="eCancel">Annuler</button>
@@ -279,6 +303,19 @@
             <button class="btn sm" id="exRank">Classements</button>
             <button class="btn sm" id="exMatches">Tous les combats</button>
             <button class="btn sm" id="exComp">Compétiteurs</button>
+          </div>
+        </fieldset>
+        <fieldset class="danger-zone">
+          <legend>Protection des données (RGPD / nLPD)</legend>
+          <p class="hint" id="privInfo"></p>
+          <p class="hint">Supprimer définitivement les <b>données personnelles</b> du tournoi : compétiteurs, équipes, pools, résultats, historique des combats et configuration des diplômes. Le nom du tournoi, sa clé, les règles et les sons sont conservés. <b>Rien ne peut être récupéré</b> : téléchargez d'abord la sauvegarde ou les classements si vous voulez garder une trace.</p>
+          <label class="f" style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" id="purgeAll"> Supprimer aussi le tournoi lui-même (la clé ne fonctionnera plus)</label>
+          <label>Pour confirmer, tapez la clé du tournoi
+            <input id="purgeKey" placeholder="XXXX-XXXX" autocomplete="off" style="text-transform:uppercase;font-weight:700;letter-spacing:.1em">
+          </label>
+          <div class="trow" style="justify-content:flex-start">
+            <button class="btn sm danger" id="purgeBtn">Supprimer toutes les données</button>
+            <a class="btn sm" href="confidentialite.html" target="_blank" id="privLink">Avis de protection des données</a>
           </div>
         </fieldset>
       </div>

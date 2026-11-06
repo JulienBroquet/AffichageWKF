@@ -1,4 +1,4 @@
-/* Affichage Kumite V2 – studio de diplômes (A4 paysage, impression / PDF) */
+/* Hantei – studio de diplômes (A4 paysage, impression / PDF) */
 'use strict';
 (() => {
 const $ = id => document.getElementById(id);
@@ -57,7 +57,10 @@ function recipients(){
   for (const p of pools){
     if (!sel.has(p.id) || p.participants.length < 1) continue;
     const done = poolDone(p) && realMatches(p).length > 0;
-    const medals = done || $('dUnfinished').checked;
+    // sous-poule : pas de médaille (elles se jouent en phase finale) ; les qualifiés reçoivent leur diplôme en phase finale
+    const fin = p.stage === 'group' ? pools.find(x => x.setId === p.setId && x.type === 'final') : null;
+    const qualified = new Set(fin ? fin.participants.map(x => x.id) : []);
+    const medals = !p.stage || p.stage === 'final' ? (done || $('dUnfinished').checked) : false;
     const T = hasResults(p) ? poolTable(p) : p.participants.map((x, i) => ({ i, name: x.name, dojo: x.dojo, rank: null }));
     const team = isTeamDisc(p);
     for (const r of T){
@@ -65,6 +68,7 @@ function recipients(){
       // équipe : un diplôme par membre, le nom de l'équipe sur la ligne du club
       const part = p.participants[r.i] || {};
       const people = team ? ((part.members || []).length ? part.members.map(m => ({ name: m.name, dojo: r.name + (r.dojo ? ' – ' + r.dojo : '') })) : [{ name: r.name, dojo: r.dojo }]) : [{ name: r.name, dojo: r.dojo }];
+      if (p.stage === 'group' && qualified.has(part.id)) continue;
       for (const x of people){
         if (k && k !== 'part' && kinds.has(k)) out.push({ kind: k, rank: r.rank, name: x.name, dojo: x.dojo, pool: p.name });
         if (kinds.has('part') && (partAll || (done && (!k || k === 'part')))) out.push({ kind: 'part', rank: r.rank, name: x.name, dojo: x.dojo, pool: p.name });

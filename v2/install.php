@@ -1,5 +1,5 @@
 <?php
-/* Affichage Kumite V2 – installation (création des tables + mot de passe super-admin) */
+/* Hantei – installation (création des tables + mot de passe super-admin) */
 declare(strict_types=1);
 require __DIR__ . '/lib/bootstrap.php';
 header('Content-Type: text/html; charset=utf-8');
@@ -39,7 +39,7 @@ try {
 }
 ?><!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Installation – Affichage Kumite</title><link rel="stylesheet" href="assets/app.css"></head>
+<title>Installation – Hantei</title><link rel="stylesheet" href="assets/app.css"></head>
 <body class="page"><main class="narrow card">
 <h1>Installation</h1>
 <?php if ($step === 'error'): ?>

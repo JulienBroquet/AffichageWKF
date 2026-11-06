@@ -1,4 +1,4 @@
-/* Affichage Kumite V2 – client de l'API + session */
+/* Hantei – client de l'API + session */
 'use strict';
 const Api = {
   token: null,
@@ -35,3 +35,12 @@ function toast(msg, ms = 3000){
   if (!t){ t = document.createElement('div'); t.id = 'toast'; t.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:10px;z-index:99;font-weight:600;max-width:90vw;box-shadow:0 4px 20px rgba(0,0,0,.3);transition:opacity .3s'; document.body.appendChild(t); }
   t.textContent = msg; t.style.opacity = 1; clearTimeout(t._h); t._h = setTimeout(() => t.style.opacity = 0, ms);
 }
+
+/* ---------- version de l'application, affichée en petit sur chaque page ---------- */
+const APP_NAME = 'Hantei', APP_VERSION = '2.3.0';
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.body.dataset.nover !== undefined) return;
+  const el = document.createElement('div');
+  el.className = 'appver'; el.innerHTML = `<b>${APP_NAME}</b> v${APP_VERSION}`;
+  document.body.appendChild(el);
+});

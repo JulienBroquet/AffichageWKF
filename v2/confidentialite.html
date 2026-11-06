@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Protection des données – Hantei</title>
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  .legal{max-width:820px;margin:24px auto;padding:0 16px 60px;line-height:1.6;font-size:15px}
+  .legal .card{padding:22px 26px}
+  .legal h1{margin-top:0}
+  .legal h2{font-size:19px;margin:22px 0 6px}
+  .legal ul{padding-left:20px}
+  .legal .tpl{background:var(--sunk);border:1px dashed #b9c2d0;border-radius:10px;padding:12px 14px;font-size:14px;white-space:pre-wrap}
+  .legal .who{background:#f5f7ff;border:1px solid #c7d2fe;border-radius:10px;padding:10px 14px}
+</style>
+</head>
+<body class="page">
+<header class="topnav">
+  <span class="brand"><span class="mark" aria-hidden="true"></span><span class="brushname" style="font-size:22px">Hantei</span>&nbsp;· Protection des données</span>
+  <span class="spacer"></span>
+  <a href="index.html">Accueil</a>
+</header>
+<main class="legal">
+  <div class="card">
+    <h1>Protection des données personnelles</h1>
+    <p class="muted" id="tName">Application de gestion de tournois de karaté utilisée par le club organisateur.</p>
+    <div class="who" id="who" hidden></div>
+
+    <h2>Quelles données ?</h2>
+    <ul>
+      <li>Pour chaque compétiteur : nom et prénom, club (dojo), sexe, âge, poids, grade et catégorie.</li>
+      <li>La composition des équipes et les résultats des combats (scores, décisions des juges, classements).</li>
+    </ul>
+    <p>Aucune adresse, aucun numéro de téléphone, aucune photo ni aucune donnée de santé n'est enregistré.</p>
+
+    <h2>Pourquoi ?</h2>
+    <p>Uniquement pour organiser le tournoi : composer les pools et les tableaux, afficher les combats sur les tatamis, publier les résultats et imprimer les diplômes. Les données ne sont ni vendues, ni transmises à des tiers, ni utilisées pour de la publicité.</p>
+
+    <h2>Qui peut les voir ?</h2>
+    <ul>
+      <li><b>L'organisation et les tables de marque</b> : toutes les données, avec un code d'accès.</li>
+      <li><b>Le public</b> (page « Résultats en direct », avec la clé du tournoi) : seulement le <b>nom, le club et les résultats</b>. L'âge, le poids et le grade ne sont jamais publiés.</li>
+    </ul>
+
+    <h2>Où et combien de temps ?</h2>
+    <p>Sur le serveur du club organisateur (hébergement web du club). Les données sont effacées par l'organisateur à la fin de la durée de conservation indiquée ci-dessus, ou plus tôt sur demande.</p>
+
+    <h2>Vos droits</h2>
+    <p>Selon le RGPD (Union européenne) et la loi suisse sur la protection des données (nLPD), vous pouvez demander à <b>consulter</b>, <b>corriger</b> ou <b>supprimer</b> vos données, ou celles de votre enfant, en écrivant au contact de l'organisateur. La suppression du nom retire aussi la personne des pools qui n'ont pas encore commencé.</p>
+
+    <h2>Texte à mettre sur le formulaire d'inscription</h2>
+    <p>L'organisateur peut copier ce texte et le compléter :</p>
+    <div class="tpl" id="tpl">En inscrivant un compétiteur, vous acceptez que [club organisateur] enregistre son nom, son club, son sexe, son âge, son poids et son grade pour organiser le tournoi [nom du tournoi]. Les résultats (nom, club et classement) sont affichés pendant la compétition et publiés en ligne. Les données sont conservées [durée] puis effacées. Pour consulter, corriger ou supprimer ces données : [contact].</div>
+    <p><button class="btn sm" id="copyTpl">Copier le texte</button></p>
+  </div>
+</main>
+<script src="assets/api.js"></script>
+<script>
+(async () => {
+  const key = fmtKey(decodeURIComponent(location.hash.slice(1)));
+  $id('copyTpl').addEventListener('click', async () => { try { await navigator.clipboard.writeText($id('tpl').textContent); toast('Texte copié.'); } catch(e){ toast('Sélectionnez le texte et copiez-le.'); } });
+  if (key.length < 9) return;
+  try {
+    const r = await Api.call('info', { key });
+    const t = r.tournament, p = r.privacy || {};
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
+    $id('tName').textContent = `Tournoi : ${t.name}${t.place ? ' – ' + t.place : ''}${t.date ? ' – ' + t.date.split('-').reverse().join('.') : ''}`;
+    if (p.contact || p.organizer){
+      $id('who').hidden = false;
+      $id('who').innerHTML = `${p.organizer ? 'Responsable : <b>' + esc(p.organizer) + '</b><br>' : ''}${p.contact ? 'Contact : <b>' + esc(p.contact) + '</b><br>' : ''}${p.retention ? 'Conservation : <b>' + esc(p.retention) + '</b> après le tournoi' : ''}`;
+    }
+    $id('tpl').textContent = $id('tpl').textContent.replace('[club organisateur]', p.organizer || '[club organisateur]').replace('[nom du tournoi]', t.name)
+      .replace('[durée]', p.retention ? p.retention + ' après le tournoi' : '[durée]').replace('[contact]', p.contact || '[contact]');
+  } catch(e){}
+})();
+</script>
+</body>
+</html>

@@ -1,9 +1,12 @@
-# Affichage Kumite – version 2 (réseau, plusieurs tatamis)
+# Hantei 判定 – gestion de tournois de karaté (version 2, réseau, plusieurs tatamis)
 
-Version en ligne de l'affichage kumite : un **serveur PHP + MySQL** (hébergement Infomaniak, sous-domaine) gère des **tournois complets** avec plusieurs tatamis en simultané.
+**Hantei** (« la décision » en japonais), anciennement *Affichage Kumite*, est la version en ligne du tableau de score : un **serveur PHP + MySQL** (hébergement Infomaniak, sous-domaine) gère des **tournois complets** avec plusieurs tatamis en simultané.
 
 - Chaque tournoi a une **clé unique** (ex. `Z94B-PFZZ`) et reste conservé (historique, archivage).
 - **Organisation centrale** : inscriptions (CSV), pesée, création des pools (manuels ou automatiques, poule ou élimination directe avec repêchage), répartition sur les tatamis, suivi en direct, classements, diplômes, exports.
+- **Sous-poules + phase finale** : une grande poule peut être divisée en 2 à 8 sous-poules (disputées en même temps sur plusieurs tatamis si on le souhaite). Les 1ers (ou les 2 premiers) de chaque sous-poule passent en phase finale (tableau, tableau + repêchage, ou poule), remplie automatiquement, avec des croisements qui évitent de rejouer un adversaire de la même sous-poule avant la finale.
+- **Têtes de série** : définies avant le tirage, elles sont placées dans des parties différentes du tableau (n° 1 et 2 en finale au plus tôt, n° 1 à 4 en demi-finale au plus tôt) ou réparties en serpentin dans les sous-poules.
+- **Protection des données (RGPD / nLPD)** : avis à accepter à la création du tournoi (responsable, contact, durée de conservation), page publique « Protection des données » avec un texte prêt pour le formulaire d'inscription, suppression de toutes les données d'un tournoi depuis l'organisation.
 - **Disciplines** : kumite individuel, **kata individuel**, **kata par équipe** et **kumite par équipe** (règles WKF 2026). Le kata est jugé au choix par les **votes des juges à partir de leurs notes** (WKF 2026), aux **drapeaux** ou aux **notes additionnées** (sans la plus haute et la plus basse), avec 3, 5 ou 7 juges.
 - **Équipes** : composées à partir des compétiteurs, de type Kata ou Kumite. Une équipe Kata ne va que dans un pool de kata par équipe, une équipe Kumite que dans un pool de kumite par équipe.
 - **Tables de marque** : une par tatami, avec l'écran TV ; elles reçoivent automatiquement leurs pools et renvoient les résultats.
@@ -51,7 +54,7 @@ Prérequis : un hébergement Web avec **PHP 8.1 ou plus** et une base **MySQL / 
 
 ### Mise à jour
 
-Déposer les nouveaux fichiers par-dessus les anciens, **sans toucher à `config.php`**. Si une version ajoute des tables, elles sont créées automatiquement au premier accès : il n'y a pas besoin de relancer `install.php`. (La version 2.2 ajoute la table des équipes et passe les scores de l'historique en décimal pour les notes de kata ; tout cela se fait automatiquement.)
+Déposer les nouveaux fichiers par-dessus les anciens, **sans toucher à `config.php`**. Si une version ajoute des tables, elles sont créées automatiquement au premier accès : il n'y a pas besoin de relancer `install.php`. (La version 2.2 ajoute la table des équipes et passe les scores de l'historique en décimal pour les notes de kata ; tout cela se fait automatiquement. La version 2.3 n'ajoute aucune table.)
 
 ## Tutoriel : déroulement d'un tournoi
 
@@ -113,6 +116,7 @@ Menu **Diplômes** :
 - La table de marque garde tout en local (navigateur) : combat en cours, pools de son tatami, sons personnalisés, file d'attente des résultats non envoyés.
 - L'écran TV est piloté localement par la table (même PC, comme la V1) : le chrono reste fluide même si le réseau est lent.
 - La lecture des noms utilise la synthèse vocale du navigateur (voix française de Windows, de macOS ou de Chrome) : elle varie selon le PC.
+- La version s'affiche en petit en bas à droite de chaque page (`APP_VERSION` dans `lib/bootstrap.php` et `assets/api.js`).
 - Sécurité : codes et mot de passe hachés (`password_hash`), sessions par jeton (72 h par défaut), limitation à 10 essais de code par quart d'heure et par adresse IP, tables limitées à leur tatami, tournois archivés en lecture seule, `config.php` et `lib/` inaccessibles depuis le web (`.htaccess`).
 
 | Fichier | Rôle |
@@ -123,8 +127,9 @@ Menu **Diplômes** :
 | `table.html` + `assets/table.js` | table de marque |
 | `display.html` | écran TV d'un tatami |
 | `public.html` | résultats publics |
+| `confidentialite.html` | avis de protection des données (RGPD / nLPD) |
 | `diplomas.html` + `assets/diplomas.js` + `assets/diplomas.css` | studio de diplômes (A4 paysage) |
 | `assets/core.js` | logique commune (affichage, pools, élimination directe, classements, sons, voix, CSV) |
-| `assets/app.css`, `assets/fonts/` | style et police Archivo (licence OFL) |
+| `assets/app.css`, `assets/fonts/` | style, police Archivo et police pinceau Yuji Boku réduite au nom « Hantei » / 判定 (licences OFL) |
 | `api.php`, `lib/bootstrap.php` | serveur |
 | `install.php` | installation des tables et du mot de passe super-admin |

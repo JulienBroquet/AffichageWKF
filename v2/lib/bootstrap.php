@@ -1,8 +1,8 @@
 <?php
-/* Affichage Kumite V2 – connexion à la base, schéma et fonctions communes */
+/* Hantei – connexion à la base, schéma et fonctions communes */
 declare(strict_types=1);
 
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 const SCHEMA_VERSION = '3';
 const KEY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // sans 0/O, 1/I pour éviter les confusions
 

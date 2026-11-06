@@ -1,5 +1,5 @@
 <?php
-/* Affichage Kumite V2 – API JSON (POST, corps JSON : { "action": "...", ... }) */
+/* Hantei – API JSON (POST, corps JSON : { "action": "...", ... }) */
 declare(strict_types=1);
 require __DIR__ . '/lib/bootstrap.php';
 
@@ -34,6 +34,15 @@ function public_tournament(array $t): array {
         'tatamis' => (int)$t['tatamis'], 'status' => $t['status'], 'rev' => (int)$t['rev'],
         'settings' => $t['settings'] ? json_decode($t['settings'], true) : null,
     ];
+}
+/* informations RGPD d'un tournoi (contact, date d'acceptation), stockées dans docs['privacy'] */
+function privacy_info(int $tid): ?array {
+    $st = db()->prepare("SELECT v FROM " . T('docs') . " WHERE tournament_id = ? AND k = 'privacy'");
+    $st->execute([$tid]);
+    $v = $st->fetchColumn();
+    if (!$v) return null;
+    $p = json_decode($v, true) ?: [];
+    return ['contact' => (string)($p['contact'] ?? ''), 'organizer' => (string)($p['organizer'] ?? ''), 'retention' => (string)($p['retention'] ?? ''), 'accepted_at' => (string)($p['accepted_at'] ?? '')];
 }
 function session(?string $token): ?array {
     if (!$token || !preg_match('/^[a-f0-9]{48}$/', $token)) return null;
@@ -210,7 +219,7 @@ try {
 
     case 'info': {
         $t = load_tournament_by_key(in_str($in, 'key', 20));
-        json_out(['ok' => true, 'tournament' => public_tournament($t)]);
+        json_out(['ok' => true, 'tournament' => public_tournament($t), 'privacy' => privacy_info((int)$t['id'])]);
     }
 
     case 'public_sync': {
@@ -267,11 +276,20 @@ try {
         $tat = max(1, min(20, in_int($in, 'tatamis', 1)));
         $date = in_str($in, 'date', 10);
         if ($date !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) fail('Date invalide.', 'bad_input');
+        // RGPD / nLPD : l'avis sur les données personnelles doit avoir été accepté
+        if (empty($in['privacy_ok'])) fail("Vous devez accepter l'avis sur la protection des données pour créer le tournoi.", 'bad_input');
+        $contact = in_str($in, 'privacy_contact', 200);
+        if ($contact === '') fail('Indiquez un contact pour les questions de protection des données (e-mail du club ou du responsable).', 'bad_input');
         $key = new_tournament_key();
         db()->prepare("INSERT INTO " . T('tournaments') . " (tkey, name, tdate, place, tatamis, pin_orga, pin_table, settings, status, rev, created_at, updated_at)
                        VALUES (?,?,?,?,?,?,?,NULL,'active',1,?,?)")
             ->execute([$key, $name, $date ?: null, in_str($in, 'place'), $tat, password_hash($po, PASSWORD_DEFAULT), password_hash($pt, PASSWORD_DEFAULT), now_sql(), now_sql()]);
-        json_out(['ok' => true, 'key' => $key, 'id' => (int)db()->lastInsertId()]);
+        $newId = (int)db()->lastInsertId();
+        $priv = ['accepted_at' => now_sql(), 'contact' => $contact, 'organizer' => in_str($in, 'privacy_organizer', 200),
+                 'retention' => in_str($in, 'privacy_retention', 40), 'notice_version' => 1];
+        db()->prepare("INSERT INTO " . T('docs') . " (tournament_id, k, v, version, updated_at) VALUES (?, 'privacy', ?, 1, ?)")
+            ->execute([$newId, json_encode($priv, JSON_UNESCAPED_UNICODE), now_sql()]);
+        json_out(['ok' => true, 'key' => $key, 'id' => $newId]);
     }
 
     case 'admin_update': {
@@ -342,7 +360,7 @@ try {
             if ((int)$cur['tatami'] !== $myTatami) fail("Ce pool n'est pas attribué à votre tatami.", 'forbidden', 403);
             // la table ne peut pas changer la définition du pool, seulement son déroulement
             $old = json_decode($cur['data'], true) ?: [];
-            foreach (['name', 'type', 'mode', 'ranking', 'format', 'repechage', 'criteria', 'memberIds', 'tatami', 'sort', 'discipline', 'kata', 'bouts'] as $k)
+            foreach (['name', 'type', 'mode', 'ranking', 'format', 'repechage', 'criteria', 'memberIds', 'tatami', 'sort', 'discipline', 'kata', 'bouts', 'seeds', 'stage', 'setId', 'setName', 'gi', 'groups', 'qualify'] as $k)
                 if (array_key_exists($k, $old)) $pool[$k] = $old[$k];
         }
         $r = save_pool($tid, $pool, isset($in['baseVersion']) ? (int)$in['baseVersion'] : null, !empty($in['force']) && $role === 'orga');
@@ -408,9 +426,31 @@ try {
         $ids = $in['ids'] ?? [];
         if (!is_array($ids)) fail('Liste invalide.', 'bad_input');
         $rev = bump_rev($tid);
-        $st = db()->prepare("UPDATE " . T('competitors') . " SET deleted = 1, rev = ?, updated_at = ? WHERE tournament_id = ? AND id = ?");
+        // RGPD : on efface aussi le contenu de la fiche (la ligne ne sert plus qu'à propager la suppression)
+        $st = db()->prepare("UPDATE " . T('competitors') . " SET deleted = 1, name = '', dojo = '', sex = '', age = NULL, weight = NULL, grade = NULL, category = '', rev = ?, updated_at = ? WHERE tournament_id = ? AND id = ?");
         foreach ($ids as $id) $st->execute([$rev, now_sql(), $tid, (string)$id]);
         json_out(['ok' => true, 'rev' => $rev]);
+    }
+
+    case 'tournament_purge': {
+        // RGPD : effacer toutes les données personnelles du tournoi (mode data) ou le tournoi entier (mode all)
+        require_role($sess, ['orga']);
+        if (normalize_key(in_str($in, 'confirm_key', 20)) !== $t['tkey']) fail('Clé de confirmation incorrecte.', 'bad_input');
+        $mode = in_str($in, 'mode', 8) === 'all' ? 'all' : 'data';
+        $pdo = db();
+        if ($mode === 'all') {
+            foreach (['competitors', 'teams', 'pools', 'live', 'results', 'sessions', 'docs'] as $tb) $pdo->prepare("DELETE FROM " . T($tb) . " WHERE tournament_id = ?")->execute([$tid]);
+            $pdo->prepare("DELETE FROM " . T('tournaments') . " WHERE id = ?")->execute([$tid]);
+            json_out(['ok' => true, 'mode' => 'all']);
+        }
+        $rev = bump_rev($tid); $now = now_sql();
+        // les lignes restent (vides) le temps que les tables et l'organisation voient la suppression
+        $pdo->prepare("UPDATE " . T('competitors') . " SET deleted = 1, name = '', dojo = '', sex = '', age = NULL, weight = NULL, grade = NULL, category = '', rev = ?, updated_at = ? WHERE tournament_id = ?")->execute([$rev, $now, $tid]);
+        $pdo->prepare("UPDATE " . T('teams') . " SET deleted = 1, name = '', dojo = '', members = '[]', rev = ?, updated_at = ? WHERE tournament_id = ?")->execute([$rev, $now, $tid]);
+        $pdo->prepare("UPDATE " . T('pools') . " SET deleted = 1, name = '', data = '{}', rev = ?, updated_at = ? WHERE tournament_id = ?")->execute([$rev, $now, $tid]);
+        foreach (['live', 'results'] as $tb) $pdo->prepare("DELETE FROM " . T($tb) . " WHERE tournament_id = ?")->execute([$tid]);
+        $pdo->prepare("DELETE FROM " . T('docs') . " WHERE tournament_id = ? AND k LIKE 'diploma%'")->execute([$tid]);
+        json_out(['ok' => true, 'mode' => 'data', 'rev' => $rev]);
     }
 
     case 'team_save': {
@@ -425,7 +465,7 @@ try {
         $ids = $in['ids'] ?? [];
         if (!is_array($ids)) fail('Liste invalide.', 'bad_input');
         $rev = bump_rev($tid);
-        $st = db()->prepare("UPDATE " . T('teams') . " SET deleted = 1, rev = ?, updated_at = ? WHERE tournament_id = ? AND id = ?");
+        $st = db()->prepare("UPDATE " . T('teams') . " SET deleted = 1, name = '', dojo = '', members = '[]', rev = ?, updated_at = ? WHERE tournament_id = ? AND id = ?");
         foreach ($ids as $id) $st->execute([$rev, now_sql(), $tid, (string)$id]);
         json_out(['ok' => true, 'rev' => $rev]);
     }

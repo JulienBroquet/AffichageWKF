@@ -2,8 +2,8 @@
 /* Affichage Kumite V2 – connexion à la base, schéma et fonctions communes */
 declare(strict_types=1);
 
-const APP_VERSION = '2.1.0';
-const SCHEMA_VERSION = '2';
+const APP_VERSION = '2.2.0';
+const SCHEMA_VERSION = '3';
 const KEY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // sans 0/O, 1/I pour éviter les confusions
 
 function app_config(): array {
@@ -71,6 +71,21 @@ function schema_sql(): array {
             PRIMARY KEY (tournament_id, id),
             KEY k_rev (tournament_id, rev)
         ) $e",
+        "CREATE TABLE IF NOT EXISTS " . T('teams') . " (
+            tournament_id INT UNSIGNED NOT NULL,
+            id VARCHAR(24) NOT NULL,
+            name VARCHAR(200) NOT NULL,
+            dojo VARCHAR(200) NOT NULL DEFAULT '',
+            kind VARCHAR(10) NOT NULL DEFAULT 'kata',
+            sex CHAR(1) NOT NULL DEFAULT '',
+            category VARCHAR(120) NOT NULL DEFAULT '',
+            members TEXT NOT NULL,
+            deleted TINYINT(1) NOT NULL DEFAULT 0,
+            rev BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            updated_at DATETIME NOT NULL,
+            PRIMARY KEY (tournament_id, id),
+            KEY k_rev (tournament_id, rev)
+        ) $e",
         "CREATE TABLE IF NOT EXISTS " . T('pools') . " (
             tournament_id INT UNSIGNED NOT NULL,
             id VARCHAR(24) NOT NULL,
@@ -104,8 +119,8 @@ function schema_sql(): array {
             aka_dojo VARCHAR(200) NOT NULL DEFAULT '',
             ao VARCHAR(200) NOT NULL DEFAULT '',
             ao_dojo VARCHAR(200) NOT NULL DEFAULT '',
-            score_aka SMALLINT NOT NULL DEFAULT 0,
-            score_ao SMALLINT NOT NULL DEFAULT 0,
+            score_aka DECIMAL(6,1) NOT NULL DEFAULT 0,
+            score_ao DECIMAL(6,1) NOT NULL DEFAULT 0,
             winner CHAR(3) NOT NULL DEFAULT '',
             detail TEXT NULL,
             created_at DATETIME NOT NULL,
@@ -140,6 +155,8 @@ function schema_sql(): array {
 
 function install_schema(): void {
     foreach (schema_sql() as $sql) db()->exec($sql);
+    // v3 : notes de kata avec décimale dans l'historique des combats
+    db()->exec("ALTER TABLE " . T('results') . " MODIFY score_aka DECIMAL(6,1) NOT NULL DEFAULT 0, MODIFY score_ao DECIMAL(6,1) NOT NULL DEFAULT 0");
     meta_set('schema_version', SCHEMA_VERSION);
 }
 

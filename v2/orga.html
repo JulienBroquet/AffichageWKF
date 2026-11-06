@@ -71,6 +71,39 @@
           <tbody id="compBody"></tbody>
         </table>
       </div>
+
+      <div class="phead" style="margin-top:30px"><div><h2 style="margin:0">Équipes <small class="muted" id="teamCount"></small></h2><p>Pour le kata et le kumite par équipe. Une équipe Kata ne peut aller que dans un pool « Kata par équipe », une équipe Kumite que dans un pool « Kumite par équipe ».</p></div>
+        <span class="spacer"></span><button class="btn primary" id="tmNew">Nouvelle équipe</button></div>
+      <div class="editor" id="teamEditor" hidden>
+        <h4 id="tmTitle">Nouvelle équipe</h4>
+        <div class="egrid">
+          <label>Nom de l'équipe<input id="tmName" placeholder="ex. KC Lausanne 1"></label>
+          <label>Type
+            <select id="tmKind"><option value="kata">Kata</option><option value="kumite">Kumite</option></select>
+          </label>
+          <label>Dojo / club<input id="tmDojo"></label>
+          <label>Sexe
+            <select id="tmSex"><option value="">–</option><option value="F">Femmes / filles</option><option value="M">Hommes / garçons</option><option value="X">Mixte</option></select>
+          </label>
+          <label>Catégorie<input id="tmCat" placeholder="ex. U16"></label>
+        </div>
+        <div class="ctools">
+          <b>Membres</b> <span class="muted" id="tmInfo"></span>
+          <input type="search" id="tmSearch" placeholder="Filtrer les compétiteurs…">
+          <label class="f" style="flex-direction:row;gap:6px"><input type="checkbox" id="tmSameDojo" checked> seulement le même dojo</label>
+        </div>
+        <div class="pchecks" id="tmChecks"></div>
+        <div class="trow" style="justify-content:flex-start">
+          <button class="btn primary" id="tmSave">Enregistrer l'équipe</button>
+          <button class="btn" id="tmCancel">Annuler</button>
+        </div>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Équipe</th><th>Type</th><th>Dojo</th><th>Sexe</th><th>Catégorie</th><th>Membres</th><th></th></tr></thead>
+          <tbody id="teamBody"></tbody>
+        </table>
+      </div>
     </div>
 
     <div data-pane="pool" hidden>
@@ -81,12 +114,15 @@
           <h4 id="eTitle">Nouveau pool</h4>
           <div class="pwarn" id="eLocked" hidden>Ce pool a déjà des résultats : la liste des compétiteurs est figée. Seuls le nom, le mode et le classement peuvent être modifiés.</div>
           <div class="egrid">
+            <label>Discipline
+              <select id="eDisc"><option value="kumite">Kumite individuel</option><option value="kata">Kata individuel</option><option value="kata_team">Kata par équipe</option><option value="kumite_team">Kumite par équipe</option></select>
+            </label>
             <label>Nom du pool<input id="eName" placeholder="ex. U12 Filles -30 kg"></label>
             <label>Type
               <select id="eType"><option value="auto">Automatique (critères)</option><option value="manual">Manuel (je choisis)</option></select>
             </label>
             <label>Tatami<select id="eTatami"></select></label>
-            <label>Mode de combat
+            <label id="eModeWrap"><span id="eModeLbl">Mode de combat</span>
               <select id="eMode"><option value="wkf">WKF</option><option value="k4x15">4 × 15</option><option value="promo">Promo</option></select>
             </label>
             <label>Format
@@ -97,14 +133,33 @@
             </label>
             <label id="eRepWrap" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-size:14px"><input type="checkbox" id="eRep" checked> Avec repêchage (WKF)</label>
           </div>
+          <div class="egrid" id="eKataWrap">
+            <label>Jugement du kata
+              <select id="eKSys">
+                <option value="votes">Notes → chaque juge vote (WKF 2026)</option>
+                <option value="flags">Drapeaux (rouge / bleu)</option>
+                <option value="scores">Notes additionnées (sans la plus haute et la plus basse)</option>
+              </select>
+            </label>
+            <label>Nombre de juges
+              <select id="eKJudges"><option value="3">3 juges</option><option value="5">5 juges</option><option value="7">7 juges</option></select>
+            </label>
+            <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-size:14px"><input type="checkbox" id="eKTimer"> Chronomètre (kata + bunkai en 5 min)</label>
+            <p class="hint" id="eKHint" style="grid-column:1/-1;margin:0"></p>
+          </div>
+          <div class="egrid" id="eTeamWrap">
+            <label>Combats par rencontre<input id="eBouts" type="number" min="1" max="7"></label>
+            <p class="hint" style="grid-column:2/-1;margin:0">WKF : 5 combats chez les hommes (3 athlètes minimum), 3 chez les femmes (2 minimum). L'équipe qui gagne le plus de combats l'emporte, puis celle qui a marqué le plus de points ; sinon, un combat décisif (une personne désignée par équipe).</p>
+          </div>
           <div id="eAuto">
             <div class="egrid">
               <label>Sexe
                 <select id="eSex"><option value="">Tous</option><option value="F">Filles / Femmes</option><option value="M">Garçons / Hommes</option></select>
               </label>
-              <label>Âge (ans, inclus)<span class="range"><input id="eAgeMin" type="number" placeholder="de"> à <input id="eAgeMax" type="number" placeholder="à"></span></label>
-              <label>Poids (kg) : plus de … jusqu'à …<span class="range"><input id="eWMin" type="number" step="0.1" placeholder="plus de"> à <input id="eWMax" type="number" step="0.1" placeholder="jusqu'à"></span></label>
-              <label>Grade (inclus)<span class="range"><select id="eGMin"></select> à <select id="eGMax"></select></span></label>
+              <label id="eTCatWrap">Catégorie d'équipe<select id="eTCat"></select></label>
+              <label class="indiv">Âge (ans, inclus)<span class="range"><input id="eAgeMin" type="number" placeholder="de"> à <input id="eAgeMax" type="number" placeholder="à"></span></label>
+              <label class="indiv">Poids (kg) : plus de … jusqu'à …<span class="range"><input id="eWMin" type="number" step="0.1" placeholder="plus de"> à <input id="eWMax" type="number" step="0.1" placeholder="jusqu'à"></span></label>
+              <label class="indiv">Grade (inclus)<span class="range"><select id="eGMin"></select> à <select id="eGMax"></select></span></label>
             </div>
           </div>
           <div id="eManual">
@@ -129,7 +184,7 @@
         <div class="ctools"><h4 id="pvName" style="margin:0"></h4><span class="spacer"></span><button class="btn sm" id="pvClose">Fermer</button></div>
         <div class="pgrid">
           <div><h4>Combats</h4><table><thead><tr><th>Tour</th><th>AKA</th><th style="text-align:center">Score</th><th>AO</th><th></th></tr></thead><tbody id="pvMatches"></tbody></table></div>
-          <div><h4>Classement</h4><table><thead><tr><th>Rg</th><th>Nom</th><th>V</th><th>D</th><th>Pts +</th><th>Pts −</th></tr></thead><tbody id="pvRanking"></tbody></table></div>
+          <div><h4>Classement</h4><table><thead><tr><th>Rg</th><th>Nom</th><th>V</th><th>D</th><th data-h="pf">Pts +</th><th data-h="pa">Pts −</th></tr></thead><tbody id="pvRanking"></tbody></table></div>
         </div>
       </div>
     </div>
@@ -172,6 +227,11 @@
             <label>Afficher un chronomètre <input type="checkbox" data-set="promo.useTimer"></label>
             <label>Durée (s) <input type="number" min="5" data-set="promo.duration"></label>
             <label>Signal avant la fin (s, 0 = aucun) <input type="number" min="0" data-set="promo.atoshi"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Kata (si chronomètre activé dans le pool)</legend>
+            <label>Durée (s) <input type="number" min="30" step="10" data-set="kata.duration"></label>
+            <label>Signal avant la fin (s, 0 = aucun) <input type="number" min="0" data-set="kata.atoshi"></label>
           </fieldset>
         </div>
       <div style="margin-top:12px;display:flex;gap:10px;align-items:center"><button class="btn primary" id="setSave">Envoyer les règles aux tables</button><span class="ok" id="setMsg"></span></div>

@@ -1,6 +1,17 @@
 /* Affichage Kumite V2 – cœur commun (affichage, pools, élimination directe, classements) */
 'use strict';
-const MODES = { wkf:'WKF', k4x15:'4 × 15', promo:'Promo' };
+const MODES = { wkf:'WKF', k4x15:'4 × 15', promo:'Promo', kata:'Kata' };
+const DISCIPLINES = { kumite:'Kumite individuel', kata:'Kata individuel', kata_team:'Kata par équipe', kumite_team:'Kumite par équipe' };
+const DISC_SHORT = { kumite:'Kumite', kata:'Kata', kata_team:'Kata équipe', kumite_team:'Kumite équipe' };
+const KATA_SYSTEMS = { votes:'Notes → vote de chaque juge (WKF 2026)', flags:'Drapeaux', scores:'Notes additionnées (sans la plus haute et la plus basse)' };
+const KATA_SHORT = { votes:'Vote des juges', flags:'Drapeaux', scores:'Notes' };
+const discOf = p => (p && p.discipline) || 'kumite';
+const isTeamDisc = p => discOf(p).endsWith('_team');
+const isKataDisc = p => discOf(p).startsWith('kata');
+const teamKindOf = p => discOf(p) === 'kata_team' ? 'kata' : 'kumite';
+const num1 = v => Math.round((+v || 0) * 10) / 10;
+const fmtPts = v => String(num1(v)).replace('.', ',');
+const resText = r => !r ? '–' : `${fmtPts(r.sa)} – ${fmtPts(r.sb)}` + (r.winner === 'draw' ? ' (nul)' : '');
 const PEN = ['C1','C2','C3','HC','H'];
 const PHASES = {
   k4x15: [
@@ -20,6 +31,7 @@ const DEFAULT_SETTINGS = {
   wkf:   { duration:180, atoshi:15, gap:8, autoSenshu:true },
   k4x15: { duration:15,  atoshi:0 },
   promo: { useTimer:false, duration:60, atoshi:0 },
+  kata:  { duration:300, atoshi:0 },
   sound: { out:'control', volume:0.8 },
   sounds: {
     atoshi: { src:'preset', preset:'bip2' },
@@ -57,7 +69,83 @@ function normalizeState(s){
 const cfg = (s=state) => s.settings[s.mode];
 const totalMs = (s=state) => cfg(s).duration * 1000;
 const atoshiMs = (s=state) => (cfg(s).atoshi||0) * 1000;
-const timerOn = (s=state) => s.mode !== 'promo' || s.settings.promo.useTimer;
+const timerOn = (s=state) => s.mode === 'promo' ? !!s.settings.promo.useTimer : s.mode === 'kata' ? !!(s.kata && s.kata.timer) : true;
+
+/* ---------- kata ---------- */
+function newKata(cfg){
+  cfg = cfg || {};
+  const n = [3, 5, 7].includes(+cfg.judges) ? +cfg.judges : 5;
+  return { system: KATA_SYSTEMS[cfg.system] ? cfg.system : 'votes', judges: n, timer: !!cfg.timer,
+    flags: Array(n).fill(null), sa: Array(n).fill(null), sb: Array(n).fill(null), reveal: false, kataA: '', kataB: '' };
+}
+function fixKata(k){
+  const n = k.judges;
+  for (const f of ['flags', 'sa', 'sb']){ k[f] = (k[f] || []).slice(0, n); while (k[f].length < n) k[f].push(null); }
+  return k;
+}
+const validScore = v => v != null && v !== '' && !isNaN(v) && +v >= 5 && +v <= 10;
+/* décision d'un kata : { va, vb, ta, tb, winner, complete, tie, votes:[...] } */
+function kataDecision(k){
+  if (!k) return null;
+  fixKata(k);
+  const n = k.judges, out = { va:0, vb:0, ta:null, tb:null, winner:null, complete:false, tie:false, votes:[] };
+  if (k.system === 'flags'){
+    k.flags.forEach(f => { out.votes.push(f); if (f === 'aka') out.va++; else if (f === 'ao') out.vb++; });
+    out.complete = k.flags.every(f => f === 'aka' || f === 'ao');
+  } else if (k.system === 'votes'){
+    let ok = true;
+    for (let j = 0; j < n; j++){
+      const a = k.sa[j], b = k.sb[j];
+      if (!validScore(a) || !validScore(b) || num1(a) === num1(b)){ out.votes.push(null); ok = false; continue; }
+      const v = num1(a) > num1(b) ? 'aka' : 'ao'; out.votes.push(v); v === 'aka' ? out.va++ : out.vb++;
+    }
+    out.complete = ok;
+  } else {
+    const drop = n >= 7 ? 2 : n >= 5 ? 1 : 0;
+    const sum = arr => { const v = arr.map(num1).sort((x, y) => x - y); return num1(v.slice(drop, v.length - drop).reduce((t, x) => t + x, 0)); };
+    out.complete = k.sa.every(validScore) && k.sb.every(validScore);
+    if (out.complete){
+      out.ta = sum(k.sa); out.tb = sum(k.sb);
+      // départage WKF : on rajoute les notes retirées (la plus basse d'abord, puis la plus haute)
+      const all = arr => arr.map(num1).sort((x, y) => x - y);
+      const A = all(k.sa), B = all(k.sb);
+      const keys = [[out.ta, out.tb], [A[0], B[0]], [A[n-1], B[n-1]]];
+      for (const [x, y] of keys){ if (x !== y){ out.winner = x > y ? 'aka' : 'ao'; break; } }
+      out.tie = !out.winner;
+    }
+    out.va = out.ta; out.vb = out.tb;
+    return out;
+  }
+  if (out.complete) out.winner = out.va > out.vb ? 'aka' : out.vb > out.va ? 'ao' : null;
+  out.tie = out.complete && !out.winner;
+  return out;
+}
+const kataResultText = (k, d) => !d ? '' : k.system === 'scores' ? `${fmtPts(d.ta)} – ${fmtPts(d.tb)}` : `${d.va} – ${d.vb}`;
+
+/* ---------- kumite par équipe ---------- */
+/* t = { n, bouts:[{ ia, ib, an, bn, sa, sb, winner:'aka'|'ao'|'draw', senshu, extra }] } */
+function teamTally(t, rr){
+  const o = { wa:0, wb:0, pa:0, pb:0, played:0, winner:null, early:false, needExtra:false, done:false, draw:false };
+  if (!t) return o;
+  let extra = null;
+  for (const b of t.bouts || []){
+    if (b.extra){ extra = b; continue; }
+    o.played++; o.pa += b.sa || 0; o.pb += b.sb || 0;
+    if (b.winner === 'aka') o.wa++; else if (b.winner === 'ao') o.wb++;
+  }
+  const left = Math.max(0, t.n - o.played);
+  if (o.wa > o.wb + left) { o.winner = 'aka'; o.early = left > 0; }
+  else if (o.wb > o.wa + left) { o.winner = 'ao'; o.early = left > 0; }
+  else if (!left){
+    if (o.wa !== o.wb) o.winner = o.wa > o.wb ? 'aka' : 'ao';
+    else if (o.pa !== o.pb) o.winner = o.pa > o.pb ? 'aka' : 'ao';
+    else if (extra && extra.winner !== 'draw') o.winner = extra.winner;
+    else if (rr) o.draw = true;
+    else o.needExtra = true;
+  }
+  o.done = !!o.winner || o.draw;
+  return o;
+}
 const remainingNow = (s=state) => s.timer.running ? Math.max(0, s.timer.endAt - Date.now()) : s.timer.remaining;
 function fmt(ms){
   const t = Math.ceil(ms/1000);
@@ -199,26 +287,28 @@ function roundRobin(n){
 }
 function poolTable(pool){
   if (pool.format === 'ko') return koRanking(pool);
-  const P = pool.participants.map((p,i) => ({ i, name:p.name, dojo:p.dojo, j:0, w:0, l:0, pf:0, pa:0 }));
+  const P = pool.participants.map((p,i) => ({ i, name:p.name, dojo:p.dojo, j:0, w:0, d:0, l:0, pf:0, pa:0, vp:0 }));
   const h2h = {};
   for (const m of pool.matches){
     if (!m.res || m.res.bye) continue;
     const A = P[m.a], B = P[m.b];
-    A.j++; B.j++; A.pf += m.res.sa; A.pa += m.res.sb; B.pf += m.res.sb; B.pa += m.res.sa;
+    A.j++; B.j++; A.pf += +m.res.sa || 0; A.pa += +m.res.sb || 0; B.pf += +m.res.sb || 0; B.pa += +m.res.sa || 0;
+    if (m.res.winner === 'draw'){ A.d++; B.d++; continue; }
     const wi = m.res.winner === 'aka' ? m.a : m.b, li = m.res.winner === 'aka' ? m.b : m.a;
     P[wi].w++; P[li].l++; h2h[wi+'>'+li] = 1;
   }
+  P.forEach(p => { p.pf = num1(p.pf); p.pa = num1(p.pa); p.vp = 3 * p.w + p.d; });
   if (pool.ranking === 'points'){
-    const cmp = (x,y) => y.pf - x.pf || y.w - x.w || x.pa - y.pa;
+    const cmp = (x,y) => y.pf - x.pf || y.vp - x.vp || x.pa - y.pa;
     P.sort(cmp);
     P.forEach((p,k) => p.rank = (k > 0 && cmp(P[k-1], p) === 0) ? P[k-1].rank : k + 1);
   } else {
     // victoires ; à égalité entre 2 : confrontation directe ; à 3+ : points marqués puis encaissés
-    const base = (x,y) => y.w - x.w || y.pf - x.pf || x.pa - y.pa;
+    const base = (x,y) => y.vp - x.vp || y.pf - x.pf || x.pa - y.pa;
     P.sort(base);
     const out = [];
     for (let k = 0; k < P.length;){
-      let e = k; while (e + 1 < P.length && P[e+1].w === P[k].w) e++;
+      let e = k; while (e + 1 < P.length && P[e+1].vp === P[k].vp) e++;
       const g = P.slice(k, e + 1);
       if (g.length === 2){
         const [x,y] = g;
@@ -262,6 +352,7 @@ function critSummary(p){
   const k = p.criteria || {}, out = [];
   const nn = v => v != null;
   if (k.sex) out.push(k.sex === 'F' ? 'Filles' : 'Garçons');
+  if (k.cat) out.push(k.cat);
   if (nn(k.ageMin) || nn(k.ageMax)) out.push(nn(k.ageMin) && nn(k.ageMax) ? `${k.ageMin}–${k.ageMax} ans` : nn(k.ageMin) ? `${k.ageMin} ans et +` : `jusqu'à ${k.ageMax} ans`);
   if (nn(k.wMin) || nn(k.wMax)) out.push(nn(k.wMin) && nn(k.wMax) ? `${k.wMin}–${k.wMax} kg` : nn(k.wMax) ? `−${k.wMax} kg` : `+${k.wMin} kg`);
   if (nn(k.gMin) || nn(k.gMax)) out.push(nn(k.gMin) && nn(k.gMax) ? (k.gMin === k.gMax ? gradeLabel(k.gMin) : `${gradeLabel(k.gMin)} → ${gradeLabel(k.gMax)}`) : nn(k.gMin) ? `dès ${gradeLabel(k.gMin)}` : `jusqu'au ${gradeLabel(k.gMax)}`);
@@ -356,8 +447,9 @@ function koRebuild(pool){
   }
 }
 function matchLabel(pool, m){
-  if (pool.format !== 'ko') return `Combat ${pool.matches.indexOf(m)+1} / ${pool.matches.length}`;
-  if (m.kind === 'rep') return `Repêchage ${m.side ? 'B' : 'A'} · combat ${m.step+1}`;
+  const w = isTeamDisc(pool) ? 'Rencontre' : isKataDisc(pool) ? 'Tour' : 'Combat';
+  if (pool.format !== 'ko') return `${w} ${pool.matches.indexOf(m)+1} / ${pool.matches.length}`;
+  if (m.kind === 'rep') return `Repêchage ${m.side ? 'B' : 'A'} · ${w.toLowerCase()} ${m.step+1}`;
   return roundName(koRounds(pool), m.r);
 }
 function koOrderKey(pool, m){
@@ -380,11 +472,11 @@ const poolDone = pool => pool.matches.length > 0 && pool.matches.every(m => m.re
 const realMatches = pool => pool.matches.filter(m => !isBye(m));
 function koRanking(pool){
   const n = pool.participants.length, S = koSize(n), R = Math.log2(S);
-  const P = pool.participants.map((p,i) => ({ i, name:p.name, dojo:p.dojo, j:0, w:0, l:0, pf:0, pa:0, rank:null, label:'En lice' }));
+  const P = pool.participants.map((p,i) => ({ i, name:p.name, dojo:p.dojo, j:0, w:0, d:0, l:0, pf:0, pa:0, rank:null, label:'En lice' }));
   for (const m of pool.matches){
     if (!m.res || m.res.bye) continue;
     const A = P[m.a], B = P[m.b];
-    A.j++; B.j++; A.pf += m.res.sa; A.pa += m.res.sb; B.pf += m.res.sb; B.pa += m.res.sa;
+    A.j++; B.j++; A.pf = num1(A.pf + (+m.res.sa || 0)); A.pa = num1(A.pa + (+m.res.sb || 0)); B.pf = num1(B.pf + (+m.res.sb || 0)); B.pa = num1(B.pa + (+m.res.sa || 0));
     P[winnerOf(m)].w++; P[loserOf(m)].l++;
   }
   const set = (i, rank, label) => { if (i != null && i >= 0 && P[i].rank == null){ P[i].rank = rank; P[i].label = label; } };
@@ -432,7 +524,7 @@ function bracketHTML(s, pool){
     const idx = pool.matches.indexOf(m), w = winnerOf(m), bye = isBye(m);
     if (bye){ const real = m.a === -1 ? m.b : m.a; return `<div class="bm bye"><div class="br ${m.a === -1 ? 'b' : 'a'} w"><span>${nm(real)}</span><i>exempt</i></div></div>`; }
     const row = (i, side, sc) => `<div class="br ${side} ${m.res && !bye ? (w === i ? 'w' : 'l') : ''} ${bye && i === -1 ? 'l' : ''}"><span>${nm(i)}</span>${m.res && !bye ? `<b>${sc}</b>` : ''}</div>`;
-    return `<div class="bm ${idx === pool.current ? 'cur' : ''}">${row(m.a, 'a', m.res ? m.res.sa : '')}${row(m.b, 'b', m.res ? m.res.sb : '')}</div>`;
+    return `<div class="bm ${idx === pool.current ? 'cur' : ''}">${row(m.a, 'a', m.res && !m.res.bye ? fmtPts(m.res.sa) : '')}${row(m.b, 'b', m.res && !m.res.bye ? fmtPts(m.res.sb) : '')}</div>`;
   };
   let cols = '';
   for (let r = start; r < R; r++){
@@ -455,20 +547,32 @@ function bracketHTML(s, pool){
   return `<div class="d-bracket" style="--fs:calc(var(--u)*${fs})"><div class="bmain">${cols}</div>${repHTML}</div>`;
 }
 const formatLabel = p => p.format === 'ko' ? ('Élimination directe' + (p.repechage ? ' + repêchage' : ' sans repêchage')) : 'Poule (chacun contre chacun)';
+const discTitle = (pool, mode) => { const d = discOf(pool);
+  return d === 'kumite' ? 'Kumite ' + (MODES[mode] || '') : d === 'kumite_team' ? 'Kumite par équipe · ' + (MODES[mode] || '') : DISCIPLINES[d]; };
+const unitWord = (pool, n) => isTeamDisc(pool) ? `${n} équipe${n > 1 ? 's' : ''}` : `${n} compétiteur${n > 1 ? 's' : ''}`;
+const matchWord = pool => isTeamDisc(pool) ? 'rencontres' : isKataDisc(pool) ? 'tours' : 'combats';
+const membersLine = p => (p.members || []).map(m => m.name).join(' · ');
+/* intitulés des colonnes de classement selon la discipline */
+function rankCols(pool){
+  const d = discOf(pool), sys = (pool.kata || {}).system || 'votes';
+  if (isKataDisc(pool)) return sys === 'scores' ? { pf:'Notes +', pa:'Notes −', draws:false } : { pf:'Votes +', pa:'Votes −', draws:false };
+  if (d === 'kumite_team') return { pf:'Combats +', pa:'Combats −', draws: pool.format !== 'ko' };
+  return { pf:'Pts +', pa:'Pts −', draws:false };
+}
 function screenHTML(s, scr){
-  const pool = s.pool, ko = pool.format === 'ko';
-  const head = (title) => `<div class="d-sh"><div class="t">${esc(title)}</div><div class="r">${esc(s.tatami||'')} · Kumite ${MODES[s.mode]}</div></div>`;
+  const pool = s.pool, ko = pool.format === 'ko', team = isTeamDisc(pool);
+  const head = (title) => `<div class="d-sh"><div class="t">${esc(title)}</div><div class="r">${esc(s.tatami||'')} · ${esc(discTitle(pool, s.mode))}</div></div>`;
   const N = pool.participants.length;
   if (scr === 'bracket' && !ko) scr = 'list';
   if (scr === 'list'){
     const cols = N <= 6 ? 2 : N <= 12 ? 3 : 4;
     const fs = N <= 4 ? 4.2 : N <= 6 ? 3.4 : N <= 9 ? 2.6 : N <= 12 ? 2.3 : N <= 16 ? 1.9 : 1.6;
-    return head(pool.name || 'Pool') + `<div class="d-sub">${critSummary(pool) ? esc(critSummary(pool)) + ' · ' : ''}${N} compétiteurs · ${ko ? formatLabel(pool) : pool.matches.length + ' combats'}</div>
+    return head(pool.name || 'Pool') + `<div class="d-sub">${critSummary(pool) ? esc(critSummary(pool)) + ' · ' : ''}${unitWord(pool, N)} · ${ko ? formatLabel(pool) : pool.matches.length + ' ' + matchWord(pool)}</div>
       <div class="d-plist" style="--cols:${cols};--fs:calc(var(--u)*${fs})">${pool.participants.map((p,i) =>
-        `<div class="d-pc"><span class="n">${i+1}</span><div><div class="nm">${esc(p.name)}</div><div class="dj">${esc(p.dojo)}</div></div></div>`).join('')}</div>`;
+        `<div class="d-pc"><span class="n">${i+1}</span><div><div class="nm">${esc(p.name)}</div><div class="dj">${esc(team ? [p.dojo, membersLine(p)].filter(Boolean).join(' – ') : p.dojo)}</div></div></div>`).join('')}</div>`;
   }
   if (scr === 'bracket'){
-    return head(pool.name || 'Tableau') + `<div class="d-sub">${formatLabel(pool)} · ${N} compétiteurs${koRounds(pool) > 3 ? ' · 3 tours affichés' : ''}</div>` + bracketHTML(s, pool);
+    return head(pool.name || 'Tableau') + `<div class="d-sub">${formatLabel(pool)} · ${unitWord(pool, N)}${koRounds(pool) > 3 ? ' · 3 tours affichés' : ''}</div>` + bracketHTML(s, pool);
   }
   if (scr === 'callup'){
     const m = pool.matches[pool.current];
@@ -476,10 +580,11 @@ function screenHTML(s, scr){
     const A = pool.participants[m.a], B = pool.participants[m.b];
     const nx = nextUnplayed(pool, pool.current);
     const nm = nx >= 0 ? pool.matches[nx] : null;
-    return head(pool.name || 'Pool') + `<div class="d-sub">${matchLabel(pool, m)} · Les compétiteurs sont appelés sur le tatami</div>
+    const dj = P => esc(P.dojo) + (team && P.members && P.members.length ? `<div class="mb">${esc(membersLine(P))}</div>` : '');
+    return head(pool.name || 'Pool') + `<div class="d-sub">${matchLabel(pool, m)} · ${team ? 'Les équipes sont appelées' : 'Les compétiteurs sont appelés'} sur le tatami</div>
       <div class="d-call ${s.swap?'swap':''}">
-        <div class="ca"><div class="tg">AKA</div><div class="nm">${esc(A.name)}</div><div class="dj">${esc(A.dojo)}</div></div>
-        <div class="cb"><div class="tg">AO</div><div class="nm">${esc(B.name)}</div><div class="dj">${esc(B.dojo)}</div></div>
+        <div class="ca"><div class="tg">AKA</div><div class="nm">${esc(A.name)}</div><div class="dj">${dj(A)}</div></div>
+        <div class="cb"><div class="tg">AO</div><div class="nm">${esc(B.name)}</div><div class="dj">${dj(B)}</div></div>
         <div class="d-vs">VS</div>
       </div>
       <div class="d-next">${nm ? `À suivre${ko ? ' (' + matchLabel(pool, nm).toLowerCase() + ')' : ''} : <b>${esc(pool.participants[nm.a].name)}</b> – <b>${esc(pool.participants[nm.b].name)}</b>` : 'Dernier combat du pool'}</div>`;
@@ -497,19 +602,19 @@ function screenHTML(s, scr){
           <td class="l">${esc(p.name)}<small>${esc(p.dojo)}</small></td><td class="l">${esc(p.label)}</td><td>${p.w}</td><td>${p.l}</td></tr>`).join('')}</tbody>
       </table></div>`;
   }
-  const pts = pool.ranking === 'points';
+  const pts = pool.ranking === 'points', C = rankCols(pool);
   return head((done ? 'Classement' : 'Classement provisoire') + ' – ' + (pool.name || 'Pool')) +
-    `<div class="d-sub">${pts ? 'Classement aux points marqués' : 'Classement standard (victoires)'}</div>
+    `<div class="d-sub">${pts ? 'Classement aux ' + C.pf.replace(' +', '').toLowerCase() : C.draws ? 'Classement : 3 pts par victoire, 1 par match nul' : 'Classement standard (victoires)'}</div>
     <div class="d-rank" style="--fs:calc(var(--u)*${fs})"><table>
-      <thead><tr><th>Rg</th><th class="l">Compétiteur</th><th>Combats</th><th class="${pts?'':'key'}">V</th><th>D</th><th class="${pts?'key':''}">Pts +</th><th>Pts −</th></tr></thead>
+      <thead><tr><th>Rg</th><th class="l">${team ? 'Équipe' : 'Compétiteur'}</th><th>${team ? 'Renc.' : isKataDisc(pool) ? 'Tours' : 'Combats'}</th><th class="${pts?'':'key'}">V</th>${C.draws ? '<th>N</th>' : ''}<th>D</th><th class="${pts?'key':''}">${C.pf}</th><th>${C.pa}</th></tr></thead>
       <tbody>${T.map(p => `<tr class="r${p.rank}"><td><span class="rk">${p.rank}</span></td>
         <td class="l">${esc(p.name)}<small>${esc(p.dojo)}</small></td><td>${p.j}</td>
-        <td class="${pts?'':'key'}">${p.w}</td><td>${p.l}</td><td class="${pts?'key':''}">${p.pf}</td><td>${p.pa}</td></tr>`).join('')}</tbody>
+        <td class="${pts?'':'key'}">${p.w}</td>${C.draws ? `<td>${p.d}</td>` : ''}<td>${p.l}</td><td class="${pts?'key':''}">${fmtPts(p.pf)}</td><td>${fmtPts(p.pa)}</td></tr>`).join('')}</tbody>
     </table></div>`;
 }
 
 const BOARD_HTML = `<div class="d-board">
-    <div class="d-top"><span data-d="dTatami"></span><span class="mid" data-d="dCat"></span><span data-d="dModeTop"></span></div>
+    <div class="d-top"><span data-d="dTatami"></span><span class="mid" data-d="dCat"></span><span class="mid d-team" data-d="dTeam" hidden></span><span data-d="dModeTop"></span></div>
     <div class="d-grid" data-d="dGrid">
       <section class="d-half d-aka" data-d="d-aka"></section>
       <div class="d-center">
@@ -535,19 +640,30 @@ function createBoard(root, getState){
       <span>Yuko<b data-k="yuko">0</b></span><span>Waza-ari<b data-k="waza">0</b></span><span>Ippon<b data-k="ippon">0</b></span>
     </div>
     <div class="d-pens" data-k="pens"></div>
+    <div class="d-kata" data-k="kata"></div>
     <div class="d-win" data-k="win" hidden>VAINQUEUR</div>`;
   for (const side of ['aka','ao']) $('d-'+side).innerHTML = halfHTML(side);
   function render(){
     const s = getState(); if (!s) return;
     $('dTatami').textContent = s.tatami || '';
     $('dCat').textContent = s.category || '';
-    $('dModeTop').textContent = 'Kumite ' + MODES[s.mode];
+    const isK = s.mode === 'kata', K = isK ? (s.kata || newKata()) : null, D = isK ? kataDecision(K) : null;
+    $('dModeTop').textContent = s.pool ? discTitle(s.pool, s.mode) : isK ? 'Kata' : 'Kumite ' + MODES[s.mode];
+    root.querySelector('.d-board').classList.toggle('is-kata', isK);
     $('dGrid').classList.toggle('swap', !!s.swap);
+    const T = s.team;
+    $('dTeam').hidden = !T; $('dCat').hidden = !!T;
+    if (T){
+      const t = teamTally(T, T.rr), cur = T.bouts.length + 1;
+      $('dTeam').innerHTML = `<span class="a">${esc(T.nameA)}</span> <b>${t.wa}</b><i>–</i><b>${t.wb}</b> <span class="b">${esc(T.nameB)}</span>`
+        + `<small>${t.done ? 'Rencontre terminée' : t.needExtra || cur > T.n ? 'Combat décisif' : 'Combat ' + Math.min(cur, T.n) + ' / ' + T.n}</small>`;
+    }
     for (const side of ['aka','ao']){
       const f = s[side], el = $('d-'+side);
       const q = k => el.querySelector(`[data-k="${k}"]`);
       const n = q('name'); n.textContent = f.name || (side==='aka'?'AKA':'AO');
       n.classList.toggle('long', (f.name||'').length > 20 && (f.name||'').length <= 30);
+      n.classList.toggle('mid', (f.name||'').length > 13 && (f.name||'').length <= 20);
       n.classList.toggle('xlong', (f.name||'').length > 30);
       q('dojo').textContent = f.dojo || '';
       q('score').textContent = total(f);
@@ -557,16 +673,30 @@ function createBoard(root, getState){
       q('pens').innerHTML = cats.map(([lbl, lv]) =>
         `<div class="d-penrow">${lbl ? `<span class="d-pl">${lbl}</span>` : ''}${PEN.map((p,i) =>
           `<span class="d-pill ${i < lv ? 'on' : ''} ${i===3?'hc':''} ${i===4?'h':''}">${p}</span>`).join('')}</div>`).join('');
+      const ke = q('kata');
+      if (isK){
+        const name = side === 'aka' ? K.kataA : K.kataB, mine = side === 'aka' ? 'aka' : 'ao';
+        let html = `<div class="kn">${name ? esc(name) : '&nbsp;'}</div>`;
+        if (K.reveal && D){
+          if (K.system === 'scores') html += `<div class="kv">${D.complete ? fmtPts(side === 'aka' ? D.ta : D.tb) : '–'}</div><div class="kl">points</div>`;
+          else html += `<div class="kflags">${D.votes.map(v => `<span class="${v === mine ? 'on ' + mine : ''}"></span>`).join('')}</div><div class="kv">${side === 'aka' ? D.va : D.vb}</div><div class="kl">${K.system === 'flags' ? 'drapeaux' : 'votes'}</div>`;
+        }
+        ke.innerHTML = html;
+      } else ke.innerHTML = '';
       q('win').hidden = s.winner !== side;
       el.classList.toggle('lost', !!s.winner && s.winner !== side);
     }
-    $('dMode').textContent = MODES[s.mode];
+    $('dMode').textContent = isK ? 'Kata' : MODES[s.mode];
     const ph = PHASES[s.mode];
     if (ph){
       const [who, what, counter] = ph[s.phase] || ph[0];
       $('dPhaseN').textContent = (s.mode === 'k4x15' ? 'Assaut ' : 'Échange ') + (s.phase+1) + ' / ' + ph.length;
       $('dPhaseT').innerHTML = `<span class="${who==='AKA'?'a':'b'}">${who}</span> ${what}` +
         (counter ? `<br><span class="${counter.startsWith('AKA')?'a':'b'}">${counter.split(' ')[0]}</span> ${counter.split(' ').slice(1).join(' ')}` : '');
+      $('dPhaseN').hidden = false; $('dPhaseT').hidden = false;
+    } else if (isK){
+      $('dPhaseN').textContent = `${KATA_SHORT[K.system]} · ${K.judges} juges`;
+      $('dPhaseT').innerHTML = K.reveal ? (s.winner ? `Décision<br><span class="${s.winner==='aka'?'a':'b'}">${s.winner.toUpperCase()}</span>` : 'Égalité') : 'Décision des juges…';
       $('dPhaseN').hidden = false; $('dPhaseT').hidden = false;
     } else { $('dPhaseN').hidden = true; $('dPhaseT').hidden = true; }
     $('dClock').hidden = !timerOn(s);
@@ -595,24 +725,31 @@ const numOrNull = v => (v === '' || v == null || isNaN(+v)) ? null : +v;
 const YEAR = new Date().getFullYear();
 const compText = c => [c.name, c.dojo, c.category, c.sex, c.age, c.weight, gradeLabel(c.grade)].join(' ').toLowerCase();
 const compInfo = (c, short) => [short ? '' : c.dojo, c.sex, c.age != null && c.age !== '' ? c.age + ' ans' : '', c.weight != null && c.weight !== '' ? c.weight + ' kg' : '', gradeLabel(c.grade)].filter(Boolean).join(' · ');
-const inPool = (c, p) => p.type === 'manual' ? (p.memberIds || []).includes(c.id) : matchesCrit(c, p.criteria || {});
+const inPool = (c, p) => p.type === 'manual' ? (p.memberIds || []).includes(c.id)
+  : isTeamDisc(p) ? (!(p.criteria || {}).sex || c.sex === p.criteria.sex) && (!(p.criteria || {}).cat || c.category === p.criteria.cat)
+  : matchesCrit(c, p.criteria || {});
+/* « entrants » possibles d'un pool : compétiteurs (individuel) ou équipes du bon type */
+const poolSource = (p, competitors, teams) => isTeamDisc(p) ? (teams || []).filter(t => !t.deleted && t.kind === teamKindOf(p)) : competitors;
+const teamMembers = (t, competitors) => (t.members || []).map(id => competitors.find(c => c.id === id)).filter(Boolean).map(c => ({ id:c.id, name:c.name, dojo:c.dojo }));
 const hasResults = p => (p.matches || []).some(m => m.res && !m.res.bye);
 /* Recalcule participants + combats d'un pool à partir de la liste des compétiteurs
    (sans effet si le pool a déjà des résultats ou un combat chargé). Renvoie true si modifié. */
-function rebuildPool(p, competitors){
+function rebuildPool(p, competitors, teams){
   if (!p.format) p.format = 'rr';
+  const team = isTeamDisc(p);
+  if (team && !teams) return false;   // liste des équipes inconnue : on ne touche à rien
   if (!p.matches) p.matches = [];
   if (!p.participants) p.participants = [];
   if (hasResults(p) || p.current >= 0) return false;
-  let mem = competitors.filter(c => inPool(c, p));
+  let mem = poolSource(p, competitors, teams).filter(c => inPool(c, p));
   if (p.format === 'ko'){
     const ids = new Set(mem.map(c => c.id));
     if (!p.draw || p.draw.length !== mem.length || !p.draw.every(id => ids.has(id))) p.draw = mem.length ? makeDraw(mem) : [];
     mem = p.draw.map(id => mem.find(c => c.id === id));
   }
   const before = JSON.stringify([p.participants, p.sig]);
-  const sig = [p.format, p.format === 'ko' && p.repechage ? 1 : 0, ...mem.map(c => c.id)].join('|');
-  p.participants = mem.map(c => ({ id:c.id, name:c.name, dojo:c.dojo }));
+  const sig = [discOf(p), p.format, p.format === 'ko' && p.repechage ? 1 : 0, ...mem.map(c => c.id)].join('|');
+  p.participants = mem.map(c => team ? { id:c.id, name:c.name, dojo:c.dojo, members:teamMembers(c, competitors) } : { id:c.id, name:c.name, dojo:c.dojo });
   if (sig !== p.sig || (!p.matches.length && mem.length >= 2)){
     p.sig = sig; p.current = -1;
     if (mem.length < 2) p.matches = [];

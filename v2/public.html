@@ -83,11 +83,19 @@
           <div class="lf">${next ? 'Prochain pool : <b>' + esc(next.name) + '</b>' : 'Aucun pool en attente'}</div></div>`;
       }
       const d = l.data, A = d.aka, B = d.ao;
-      const showTimer = d.mode !== 'promo';
-      const side = (f, cls, key) => `<div class="${cls}"><span class="n">${esc(f.name || key.toUpperCase())}${d.winner === key ? ' 🏆' : ''}${f.senshu && d.mode === 'wkf' ? ' <span class="pill" style="background:var(--warn);color:#3b2f00">S</span>' : ''}</span><span class="d">${esc(f.dojo || '')}</span><span class="sc">${total(f)}</span></div>`;
+      const K = d.mode === 'kata' ? d.kata : null, KD = K && K.reveal ? kataDecision(K) : null;
+      const showTimer = d.mode === 'kata' ? !!(K && K.timer) : d.mode !== 'promo';
+      const scoreOf = key => {
+        if (!K) return total(key === 'aka' ? A : B);
+        if (!KD) return '';
+        return K.system === 'scores' ? (KD.complete ? fmtPts(key === 'aka' ? KD.ta : KD.tb) : '–') : (key === 'aka' ? KD.va : KD.vb);
+      };
+      const side = (f, cls, key) => `<div class="${cls}"><span class="n">${esc(f.name || key.toUpperCase())}${d.winner === key ? ' 🏆' : ''}${f.senshu && d.mode === 'wkf' ? ' <span class="pill" style="background:var(--warn);color:#3b2f00">S</span>' : ''}</span><span class="d">${esc(K ? (key === 'aka' ? K.kataA : K.kataB) || f.dojo || '' : f.dojo || '')}</span><span class="sc">${scoreOf(key)}</span></div>`;
+      let teamLine = '';
+      if (d.team){ const tt = teamTally(d.team, d.team.rr); teamLine = `<div class="lf"><b>${esc(d.team.nameA)}</b> ${tt.wa} – ${tt.wb} <b>${esc(d.team.nameB)}</b> · ${tt.done ? 'rencontre terminée' : 'combat ' + Math.min(tt.played + 1, d.team.n) + '/' + d.team.n}</div>`; }
       return `<div class="lcard"><div class="lh"><span>Tatami ${t}${d.poolName ? ' — ' + esc(d.poolName) : ''}</span>${showTimer ? `<span class="lclock" data-t="${t}">${fmt(remaining(l))}</span>` : ''}</div>
-        <div class="duel">${side(A, 'side-a', 'aka')}${side(B, 'side-b', 'ao')}</div>
-        <div class="lf">${esc(d.matchLabel || '')}${d.winner ? (d.matchLabel ? ', ' : '') + 'combat terminé' : ''}</div></div>`;
+        ${teamLine}<div class="duel">${side(A, 'side-a', 'aka')}${side(B, 'side-b', 'ao')}</div>
+        <div class="lf">${K ? 'Kata · ' + esc(KATA_SHORT[K.system] || '') + ' · ' : ''}${esc(d.matchLabel || '')}${d.winner ? (d.matchLabel ? ', ' : '') + (K ? 'décision rendue' : 'combat terminé') : ''}</div></div>`;
     }).join('');
   }
   setInterval(() => document.querySelectorAll('.lclock').forEach(el => { const l = live[el.dataset.t]; if (l) el.textContent = fmt(remaining(l)); }), 250);
@@ -96,7 +104,7 @@
     const pn = i => i == null ? '<span class="muted">à déterminer</span>' : esc(p.participants[i].name);
     const r = m.res;
     return `<div class="mres"><span class="${r && r.winner === 'aka' ? 'w' : ''}" style="border-left:3px solid var(--aka);padding-left:6px">${pn(m.a)}</span>
-      <span class="c">${r ? r.sa + ' – ' + r.sb : 'vs'}</span><span class="r ${r && r.winner === 'ao' ? 'w' : ''}" style="border-right:3px solid var(--ao);padding-right:6px">${pn(m.b)}</span></div>`;
+      <span class="c">${r ? resText(r) : 'vs'}</span><span class="r ${r && r.winner === 'ao' ? 'w' : ''}" style="border-right:3px solid var(--ao);padding-right:6px">${pn(m.b)}</span></div>`;
   }
   function poolBody(p){
     let html = '';
@@ -108,17 +116,18 @@
     return html || '<div class="muted">Pas encore de combats.</div>';
   }
   function rankTable(p){
-    const T = poolTable(p);
-    return `<table class="tablelist" style="margin-top:8px"><thead><tr><th>Rg</th><th>Nom</th>${p.format === 'ko' ? '<th>Résultat</th>' : '<th>V</th><th>Pts</th>'}</tr></thead>
-      <tbody>${T.map(r => `<tr><td><b>${r.rank ?? '–'}</b></td><td>${esc(r.name)}<br><small class="muted">${esc(r.dojo)}</small></td>${p.format === 'ko' ? `<td>${esc(r.label)}</td>` : `<td>${r.w}</td><td>${r.pf}</td>`}</tr>`).join('')}</tbody></table>`;
+    const T = poolTable(p), C = rankCols(p);
+    const sub = r => { const part = p.participants[r.i] || {}; return esc(r.dojo) + (part.members && part.members.length ? ' · ' + esc(membersLine(part)) : ''); };
+    return `<table class="tablelist" style="margin-top:8px"><thead><tr><th>Rg</th><th>${isTeamDisc(p) ? 'Équipe' : 'Nom'}</th>${p.format === 'ko' ? '<th>Résultat</th>' : `<th>V</th>${C.draws ? '<th>N</th>' : ''}<th>${C.pf.replace(' +', '')}</th>`}</tr></thead>
+      <tbody>${T.map(r => `<tr><td><b>${r.rank ?? '–'}</b></td><td>${esc(r.name)}<br><small class="muted">${sub(r)}</small></td>${p.format === 'ko' ? `<td>${esc(r.label)}</td>` : `<td>${r.w}</td>${C.draws ? `<td>${r.d}</td>` : ''}<td>${fmtPts(r.pf)}</td>`}</tr>`).join('')}</tbody></table>`;
   }
   function pill(p){ const s = poolStatusOf(p); return s === 'done' ? '<span class="pill green">Terminé</span>' : s === 'live' ? '<span class="pill blue">En cours</span>' : `<span class="pill grey">${p.tatami ? 'Tatami ' + p.tatami : 'À venir'}</span>`; }
   function renderPools(){
     const q = $id('q').value.trim().toLowerCase();
     const L = list().filter(p => !q || p.name.toLowerCase().includes(q) || p.participants.some(x => (x.name + ' ' + x.dojo).toLowerCase().includes(q)));
     $id('pools').innerHTML = L.length ? L.map(p => `<details data-pid="${p.id}" ${open.has(p.id) || q ? 'open' : ''}>
-      <summary><span>${esc(p.name)} <small class="muted">· ${p.participants.length} compét.</small></span>${pill(p)}</summary>
-      <div class="muted" style="font-size:12px;margin:6px 0">${esc(formatLabel(p))}${p.tatami ? ' · tatami ' + p.tatami : ''}</div>
+      <summary><span>${esc(p.name)} <small class="muted">· ${DISC_SHORT[discOf(p)]} · ${unitWord(p, p.participants.length)}</small></span>${pill(p)}</summary>
+      <div class="muted" style="font-size:12px;margin:6px 0">${esc(DISCIPLINES[discOf(p)])} · ${esc(formatLabel(p))}${isKataDisc(p) ? ' · ' + esc(KATA_SHORT[(p.kata || {}).system || 'votes']) : ''}${p.tatami ? ' · tatami ' + p.tatami : ''}</div>
       ${poolBody(p)}${hasResults(p) ? rankTable(p) : ''}</details>`).join('') : '<div class="card muted">Aucun pool publié pour l\'instant.</div>';
   }
   function renderRanks(){

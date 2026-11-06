@@ -16,6 +16,7 @@
         <option value="wkf">WKF</option>
         <option value="k4x15">4 × 15</option>
         <option value="promo">Promo</option>
+        <option value="kata">Kata</option>
       </select>
     </label>
     <label>Catégorie <input id="category" placeholder="U14 F -42 kg"></label>
@@ -37,6 +38,41 @@
         <button class="btn win" id="flFinish">Terminer le combat ▶ suivant</button>
         <button class="btn primary" id="flNextPool">Pool suivant ▶</button>
       </div>
+    </section>
+    <section class="card kpanel" id="kataPanel" hidden>
+      <div class="ctools">
+        <b class="ktitle">Décision des juges</b>
+        <label class="f">Jugement <select id="kSys"><option value="votes">Notes → vote de chaque juge (WKF 2026)</option><option value="flags">Drapeaux</option><option value="scores">Notes additionnées</option></select></label>
+        <label class="f">Juges <select id="kJudges"><option value="3">3</option><option value="5">5</option><option value="7">7</option></select></label>
+        <label class="f" style="flex-direction:row;gap:6px"><input type="checkbox" id="kTimer"> Chrono</label>
+        <span class="spacer"></span>
+        <button class="btn sm" id="kClear">Effacer les décisions</button>
+      </div>
+      <div class="krow">
+        <label class="ka">Kata AKA <input id="kKataA" list="kataNames" autocomplete="off" placeholder="ex. Bassai Dai"></label>
+        <label class="kb">Kata AO <input id="kKataB" list="kataNames" autocomplete="off" placeholder="ex. Kanku Dai"></label>
+      </div>
+      <div class="kgrid" id="kGrid"></div>
+      <div class="kdec">
+        <span id="kDec"></span>
+        <span class="spacer"></span>
+        <button class="btn primary" id="kReveal">Annoncer la décision</button>
+      </div>
+      <datalist id="kataNames"></datalist>
+    </section>
+    <section class="card tpanel" id="teamPanel" hidden>
+      <div class="tscore" id="tmScore"></div>
+      <div class="ctools tmctl">
+        <b id="tmBoutN">Combat 1</b>
+        <label class="f ka">AKA <select id="tmA"></select></label>
+        <label class="f kb">AO <select id="tmB"></select></label>
+        <button class="btn dark" id="tmLoad">Charger ce combat</button>
+        <span class="spacer"></span>
+        <button class="btn" id="tmDraw" title="Égalité de points sans senshu (pas possible au combat décisif)">Hikiwake</button>
+        <button class="btn win" id="tmRecord">Enregistrer le combat</button>
+      </div>
+      <div class="alertbox" id="tmMsg" hidden></div>
+      <table class="tmbouts"><thead><tr><th>#</th><th>AKA</th><th style="text-align:center">Score</th><th>AO</th><th>Résultat</th><th></th></tr></thead><tbody id="tmBouts"></tbody></table>
     </section>
     <section class="c-row">
       <div class="card fighter aka" id="f-aka"></div>
@@ -92,7 +128,7 @@
           </div>
           <div class="pgrid">
             <div><h4>Combats</h4><table><thead><tr><th>#</th><th>AKA</th><th style="text-align:center">Score</th><th>AO</th><th></th><th></th></tr></thead><tbody id="pvMatches"></tbody></table></div>
-            <div><h4>Classement</h4><table><thead><tr><th>Rg</th><th>Nom</th><th>V</th><th>D</th><th>Pts +</th><th>Pts −</th></tr></thead><tbody id="pvRanking"></tbody></table></div>
+            <div><h4>Classement</h4><table><thead><tr><th>Rg</th><th>Nom</th><th>V</th><th>D</th><th data-h="pf">Pts +</th><th data-h="pa">Pts −</th></tr></thead><tbody id="pvRanking"></tbody></table></div>
           </div>
           <p class="hint" id="pvHint"></p>
         </div>
@@ -117,6 +153,11 @@
             <label>Afficher un chronomètre <input type="checkbox" data-set="promo.useTimer"></label>
             <label>Durée (s) <input type="number" min="5" data-set="promo.duration"></label>
             <label>Signal avant la fin (s, 0 = aucun) <input type="number" min="0" data-set="promo.atoshi"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Kata</legend>
+            <label>Durée du chrono kata (s) <input type="number" min="30" step="10" data-set="kata.duration"></label>
+            <label>Signal avant la fin (s, 0 = aucun) <input type="number" min="0" data-set="kata.atoshi"></label>
           </fieldset>
           <fieldset>
             <legend>Son</legend>

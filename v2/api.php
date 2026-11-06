@@ -77,6 +77,30 @@ function competitor_out(array $r): array {
         'age' => $r['age'] === null ? null : (int)$r['age'], 'weight' => $r['weight'] === null ? null : (float)$r['weight'],
         'grade' => $r['grade'] === null ? null : (int)$r['grade'], 'category' => $r['category'], 'deleted' => (int)$r['deleted'] === 1];
 }
+function clean_team(array $t): array {
+    $id = preg_replace('/[^A-Za-z0-9_-]/', '', (string)($t['id'] ?? ''));
+    if ($id === '' || strlen($id) > 24) fail("Identifiant d'équipe invalide.", 'bad_input');
+    $name = mb_substr(trim((string)($t['name'] ?? '')), 0, 200);
+    if ($name === '') fail("Nom d'équipe manquant.", 'bad_input');
+    $members = array_values(array_slice(array_filter(array_map(fn($x) => preg_replace('/[^A-Za-z0-9_-]/', '', (string)$x), is_array($t['members'] ?? null) ? $t['members'] : [])), 0, 12));
+    return ['id' => $id, 'name' => $name, 'dojo' => mb_substr(trim((string)($t['dojo'] ?? '')), 0, 200),
+        'kind' => ($t['kind'] ?? '') === 'kumite' ? 'kumite' : 'kata', 'sex' => in_array($t['sex'] ?? '', ['F', 'M', 'X'], true) ? $t['sex'] : '',
+        'category' => mb_substr(trim((string)($t['category'] ?? '')), 0, 120), 'members' => $members];
+}
+function team_out(array $r): array {
+    return ['id' => $r['id'], 'name' => $r['name'], 'dojo' => $r['dojo'], 'kind' => $r['kind'], 'sex' => $r['sex'], 'category' => $r['category'],
+        'members' => json_decode($r['members'], true) ?: [], 'deleted' => (int)$r['deleted'] === 1];
+}
+function upsert_teams(int $tid, array $items): int {
+    $rev = bump_rev($tid);
+    $st = db()->prepare("INSERT INTO " . T('teams') . " (tournament_id, id, name, dojo, kind, sex, category, members, deleted, rev, updated_at) VALUES (?,?,?,?,?,?,?,?,0,?,?)
+        ON DUPLICATE KEY UPDATE name=VALUES(name), dojo=VALUES(dojo), kind=VALUES(kind), sex=VALUES(sex), category=VALUES(category), members=VALUES(members), deleted=0, rev=VALUES(rev), updated_at=VALUES(updated_at)");
+    foreach ($items as $t) {
+        $t = clean_team(is_array($t) ? $t : []);
+        $st->execute([$tid, $t['id'], $t['name'], $t['dojo'], $t['kind'], $t['sex'], $t['category'], json_encode($t['members']), $rev, now_sql()]);
+    }
+    return $rev;
+}
 function pool_out(array $r, bool $public = false): array {
     $data = json_decode($r['data'], true) ?: [];
     if ($public) unset($data['memberIds'], $data['draw']);
@@ -134,7 +158,7 @@ function log_results(int $tid, array $results, ?int $tatami): void {
         if (!is_array($r) || empty($r['rid'])) continue;
         $s = fn($k, $n = 200) => mb_substr((string)($r[$k] ?? ''), 0, $n);
         $st->execute([$tid, $s('rid', 40), $s('pool_id', 24), $s('pool_name'), $s('label', 120), $tatami, $s('aka'), $s('aka_dojo'), $s('ao'), $s('ao_dojo'),
-            (int)($r['sa'] ?? 0), (int)($r['sb'] ?? 0), in_array($r['winner'] ?? '', ['aka', 'ao'], true) ? $r['winner'] : '',
+            round((float)($r['sa'] ?? 0), 1), round((float)($r['sb'] ?? 0), 1), in_array($r['winner'] ?? '', ['aka', 'ao'], true) ? $r['winner'] : '',
             isset($r['detail']) ? json_encode($r['detail'], JSON_UNESCAPED_UNICODE) : null, now_sql()]);
     }
 }
@@ -147,6 +171,9 @@ function sync_payload(array $t, int $since, string $role, ?int $tatami): array {
         $st = $pdo->prepare("SELECT * FROM " . T('competitors') . " WHERE tournament_id = ? AND rev > ?" . ($full ? " AND deleted = 0" : "") . " ORDER BY name");
         $st->execute([$tid, $since]);
         $out['competitors'] = array_map('competitor_out', $st->fetchAll());
+        $st = $pdo->prepare("SELECT * FROM " . T('teams') . " WHERE tournament_id = ? AND rev > ?" . ($full ? " AND deleted = 0" : "") . " ORDER BY name");
+        $st->execute([$tid, $since]);
+        $out['teams'] = array_map('team_out', $st->fetchAll());
     }
     $sql = "SELECT * FROM " . T('pools') . " WHERE tournament_id = ? AND rev > ?" . ($full ? " AND deleted = 0" : "");
     $args = [$tid, $since];
@@ -271,7 +298,7 @@ try {
         require_role($sess, ['admin']);
         $t = load_tournament(in_int($in, 'id', 0));
         if (normalize_key(in_str($in, 'confirm_key', 20)) !== $t['tkey']) fail('Clé de confirmation incorrecte.', 'bad_input');
-        foreach (['competitors', 'pools', 'live', 'results', 'sessions', 'docs'] as $tb) db()->prepare("DELETE FROM " . T($tb) . " WHERE tournament_id = ?")->execute([(int)$t['id']]);
+        foreach (['competitors', 'teams', 'pools', 'live', 'results', 'sessions', 'docs'] as $tb) db()->prepare("DELETE FROM " . T($tb) . " WHERE tournament_id = ?")->execute([(int)$t['id']]);
         db()->prepare("DELETE FROM " . T('tournaments') . " WHERE id = ?")->execute([(int)$t['id']]);
         json_out(['ok' => true]);
     }
@@ -315,7 +342,7 @@ try {
             if ((int)$cur['tatami'] !== $myTatami) fail("Ce pool n'est pas attribué à votre tatami.", 'forbidden', 403);
             // la table ne peut pas changer la définition du pool, seulement son déroulement
             $old = json_decode($cur['data'], true) ?: [];
-            foreach (['name', 'type', 'mode', 'ranking', 'format', 'repechage', 'criteria', 'memberIds', 'tatami', 'sort'] as $k)
+            foreach (['name', 'type', 'mode', 'ranking', 'format', 'repechage', 'criteria', 'memberIds', 'tatami', 'sort', 'discipline', 'kata', 'bouts'] as $k)
                 if (array_key_exists($k, $old)) $pool[$k] = $old[$k];
         }
         $r = save_pool($tid, $pool, isset($in['baseVersion']) ? (int)$in['baseVersion'] : null, !empty($in['force']) && $role === 'orga');
@@ -344,7 +371,7 @@ try {
         $data = $in['state'] ?? null;
         if (!is_array($data)) fail('État manquant.', 'bad_input');
         // on ne garde que ce qui sert à l'affichage public
-        $keep = array_intersect_key($data, array_flip(['mode', 'aka', 'ao', 'winner', 'timer', 'phase', 'screen', 'category', 'poolId', 'poolName', 'matchLabel', 'remainingAtPush', 'online']));
+        $keep = array_intersect_key($data, array_flip(['mode', 'aka', 'ao', 'winner', 'timer', 'phase', 'screen', 'category', 'poolId', 'poolName', 'matchLabel', 'remainingAtPush', 'online', 'discipline', 'kata', 'team']));
         db()->prepare("INSERT INTO " . T('live') . " (tournament_id, tatami, data, updated_ms) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE data = VALUES(data), updated_ms = VALUES(updated_ms)")
             ->execute([$tid, $tat, json_encode($keep, JSON_UNESCAPED_UNICODE), now_ms()]);
         json_out(['ok' => true, 'now' => now_ms()]);
@@ -382,6 +409,23 @@ try {
         if (!is_array($ids)) fail('Liste invalide.', 'bad_input');
         $rev = bump_rev($tid);
         $st = db()->prepare("UPDATE " . T('competitors') . " SET deleted = 1, rev = ?, updated_at = ? WHERE tournament_id = ? AND id = ?");
+        foreach ($ids as $id) $st->execute([$rev, now_sql(), $tid, (string)$id]);
+        json_out(['ok' => true, 'rev' => $rev]);
+    }
+
+    case 'team_save': {
+        require_writable($t);
+        $items = $in['items'] ?? [];
+        if (!is_array($items) || count($items) > 1000) fail('Liste invalide.', 'bad_input');
+        json_out(['ok' => true, 'rev' => upsert_teams($tid, $items)]);
+    }
+
+    case 'team_delete': {
+        require_writable($t);
+        $ids = $in['ids'] ?? [];
+        if (!is_array($ids)) fail('Liste invalide.', 'bad_input');
+        $rev = bump_rev($tid);
+        $st = db()->prepare("UPDATE " . T('teams') . " SET deleted = 1, rev = ?, updated_at = ? WHERE tournament_id = ? AND id = ?");
         foreach ($ids as $id) $st->execute([$rev, now_sql(), $tid, (string)$id]);
         json_out(['ok' => true, 'rev' => $rev]);
     }
@@ -424,7 +468,7 @@ try {
         $st = db()->prepare("SELECT * FROM " . T('results') . " WHERE tournament_id = ? ORDER BY id");
         $st->execute([$tid]);
         json_out(['ok' => true, 'backup' => ['app' => 'affichage-kumite', 'version' => 2, 'date' => gmdate('c'),
-            'tournament' => $p['tournament'], 'competitors' => $p['competitors'], 'pools' => array_map(fn($x) => $x['data'], $p['pools']),
+            'tournament' => $p['tournament'], 'competitors' => $p['competitors'], 'teams' => $p['teams'], 'pools' => array_map(fn($x) => $x['data'], $p['pools']),
             'results' => $st->fetchAll(), 'docs' => (function() use ($tid) {
                 $d = db()->prepare("SELECT k, v FROM " . T('docs') . " WHERE tournament_id = ?"); $d->execute([$tid]);
                 $o = []; foreach ($d->fetchAll() as $r) $o[$r['k']] = json_decode($r['v'], true); return (object)$o; })()]]);
@@ -439,6 +483,8 @@ try {
         $pdo->prepare("UPDATE " . T('competitors') . " SET deleted = 1, rev = ? WHERE tournament_id = ?")->execute([$rev, $tid]);
         $pdo->prepare("UPDATE " . T('pools') . " SET deleted = 1, rev = ?, version = version + 1 WHERE tournament_id = ?")->execute([$rev, $tid]);
         upsert_competitors($tid, $comps);
+        $pdo->prepare("UPDATE " . T('teams') . " SET deleted = 1, rev = ? WHERE tournament_id = ?")->execute([$rev, $tid]);
+        if (isset($in['teams']) && is_array($in['teams'])) upsert_teams($tid, $in['teams']);
         foreach ($pools as $pl) if (is_array($pl)) save_pool($tid, $pl, null, true);
         if (isset($in['docs']) && is_array($in['docs'])) {
             $ins = $pdo->prepare("INSERT INTO " . T('docs') . " (tournament_id, k, v, version, updated_at) VALUES (?,?,?,1,?)

@@ -4,6 +4,8 @@ Version en ligne de l'affichage kumite : un **serveur PHP + MySQL** (hébergemen
 
 - Chaque tournoi a une **clé unique** (ex. `Z94B-PFZZ`) et reste conservé (historique, archivage).
 - **Organisation centrale** : inscriptions (CSV), pesée, création des pools (manuels ou automatiques, poule ou élimination directe avec repêchage), répartition sur les tatamis, suivi en direct, classements, diplômes, exports.
+- **Disciplines** : kumite individuel, **kata individuel**, **kata par équipe** et **kumite par équipe** (règles WKF 2026). Le kata est jugé au choix par les **votes des juges à partir de leurs notes** (WKF 2026), aux **drapeaux** ou aux **notes additionnées** (sans la plus haute et la plus basse), avec 3, 5 ou 7 juges.
+- **Équipes** : composées à partir des compétiteurs, de type Kata ou Kumite. Une équipe Kata ne va que dans un pool de kata par équipe, une équipe Kumite que dans un pool de kumite par équipe.
 - **Tables de marque** : une par tatami, avec l'écran TV ; elles reçoivent automatiquement leurs pools et renvoient les résultats.
 - **Appel des combattants** : son d'appel et lecture des noms par synthèse vocale.
 - **Page publique** (téléphones des parents et des coachs) : tatamis en direct, pools, classements – nom et club uniquement.
@@ -49,7 +51,7 @@ Prérequis : un hébergement Web avec **PHP 8.1 ou plus** et une base **MySQL / 
 
 ### Mise à jour
 
-Déposer les nouveaux fichiers par-dessus les anciens, **sans toucher à `config.php`**. Si une version ajoute des tables, elles sont créées automatiquement au premier accès : il n'y a pas besoin de relancer `install.php`.
+Déposer les nouveaux fichiers par-dessus les anciens, **sans toucher à `config.php`**. Si une version ajoute des tables, elles sont créées automatiquement au premier accès : il n'y a pas besoin de relancer `install.php`. (La version 2.2 ajoute la table des équipes et passe les scores de l'historique en décimal pour les notes de kata ; tout cela se fait automatiquement.)
 
 ## Tutoriel : déroulement d'un tournoi
 
@@ -61,9 +63,10 @@ Déposer les nouveaux fichiers par-dessus les anciens, **sans toucher à `config
 
 Accueil (`index.html`) → clé → **Organisation** → code organisateur. Le menu de gauche donne accès à toutes les sections.
 
-1. **Compétiteurs** : **« Importer un CSV… »** (même format que la V1 ; un **« Modèle CSV »** est téléchargeable) ou saisie dans le formulaire. Le bouton ✎ d'une ligne permet de corriger une fiche, par exemple après la pesée.
+1. **Compétiteurs** : **« Importer un CSV… »** (même format que la V1 ; un **« Modèle CSV »** est téléchargeable) ou saisie dans le formulaire. Le bouton ✎ d'une ligne permet de corriger une fiche, par exemple après la pesée. Sous la liste, la section **Équipes** permet de créer les équipes de kata et de kumite (**« Nouvelle équipe »**, puis cocher les membres).
 2. **Pools** → **« Nouveau pool »** :
-   - type **automatique** (sexe, âge, poids, grade) ou **manuel** (cases à cocher) ;
+   - **discipline** : kumite individuel, kata individuel, kata par équipe ou kumite par équipe. Pour le kata, choisir le **jugement** (votes des juges WKF 2026, drapeaux ou notes additionnées), le nombre de juges et le chrono éventuel. Pour le kumite par équipe, choisir le nombre de combats par rencontre ;
+   - type **automatique** (sexe, âge, poids, grade ; sexe et catégorie pour les équipes) ou **manuel** (cases à cocher) ;
    - **tatami**, **mode de combat** (WKF, 4 × 15, Promo), **format** (poule ou élimination directe, avec ou sans repêchage) ;
    - → **« Enregistrer le pool »**. Des alertes signalent les compétiteurs sans pool ou présents dans plusieurs pools, et les pools sans tatami.
 3. **Tatamis** : vérifier l'**ordre des pools par tatami** (flèches ↑ ↓, ou changer de tatami avec la liste déroulante).

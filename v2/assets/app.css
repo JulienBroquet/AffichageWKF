@@ -419,6 +419,26 @@ body.is-display{background:#000;overflow:hidden;cursor:default}
 .d-pill.on.h{background:#111;border-color:#fff;color:#fff}
 .d-win{position:absolute;left:0;right:0;top:42%;transform:translateY(-50%) rotate(-4deg);text-align:center;font-size:calc(var(--u)*4.6);font-weight:900;letter-spacing:calc(var(--u)*.5);background:rgba(255,255,255,.95);color:#111;padding:calc(var(--u)*.6) 0;box-shadow:0 0 calc(var(--u)*3) rgba(0,0,0,.4)}
 .d-half.lost{filter:saturate(.35) brightness(.55)}
+/* kata */
+.d-kata{display:none}
+.is-kata .d-score,.is-kata .d-counts,.is-kata .d-pens,.is-kata .d-senshu{display:none}
+.is-kata .d-kata{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--u)*1.2);width:100%}
+.is-kata .d-name{font-size:calc(var(--u)*4.8);margin-top:calc(var(--u)*1.4)}
+.is-kata .d-name.mid{font-size:calc(var(--u)*4)}
+.is-kata .d-name.long,.is-kata .d-name.xlong{font-size:calc(var(--u)*3.6)}
+.d-kata .kn{font-size:calc(var(--u)*3.6);font-weight:700;font-style:italic;opacity:.95;text-align:center}
+.d-kata .kv{font-size:calc(var(--u)*15);font-weight:800;line-height:1;font-stretch:66%;font-variant-numeric:tabular-nums}
+.d-kata .kl{font-size:calc(var(--u)*2.2);text-transform:uppercase;letter-spacing:calc(var(--u)*.3);opacity:.8}
+.d-kata .kflags{display:flex;gap:calc(var(--u)*1)}
+.d-kata .kflags span{width:calc(var(--u)*3.6);height:calc(var(--u)*3.6);border-radius:50%;border:calc(var(--u)*.3) solid rgba(255,255,255,.5)}
+.d-kata .kflags span.on{background:#fff;border-color:#fff;box-shadow:0 0 calc(var(--u)*1.2) rgba(255,255,255,.7)}
+/* rencontre par équipe (barre du haut) */
+.d-top .d-team{display:flex;align-items:center;justify-content:center;gap:calc(var(--u)*1);color:#fff}
+.d-team .a{color:#ff6b78}.d-team .b{color:#7da2ff}
+.d-team b{font-size:calc(var(--u)*3);font-stretch:66%;background:#fff;color:#111;border-radius:calc(var(--u)*.5);padding:0 calc(var(--u)*.8);line-height:1.2}
+.d-team i{font-style:normal;opacity:.6}
+.d-team small{font-size:calc(var(--u)*1.6);color:#9aa3b2;margin-left:calc(var(--u)*1)}
+.d-call .dj .mb{font-size:.7em;opacity:.85;margin-top:calc(var(--u)*.6)}
 .d-center{background:#0b0c10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--u)*1.4);padding:calc(var(--u)*1);text-align:center}
 .d-mode{font-size:calc(var(--u)*1.8);color:#9aa3b2;font-weight:700;letter-spacing:calc(var(--u)*.2);text-transform:uppercase}
 .d-clock{font-size:calc(var(--u)*7);font-weight:800;font-variant-numeric:tabular-nums;line-height:1;padding:calc(var(--u)*1) calc(var(--u)*1.2);border-radius:calc(var(--u)*1);border:calc(var(--u)*.3) solid #2a2e37;color:#fff}
@@ -511,3 +531,44 @@ body.is-display{background:#000;overflow:hidden;cursor:default}
 .side nav.tabs a svg{width:18px;height:18px;flex:none;opacity:.8}
 .side nav.tabs a:hover{background:var(--ai-2);color:#fff}
 @media (max-width:900px){.side nav.tabs a{padding:8px 10px}.side nav.tabs a svg{display:none}}
+
+/* ---------- table de marque : kata & équipes ---------- */
+.is-kata .fighter .srow,.is-kata .fighter .pensec,.is-kata .fighter [data-act="senshu"],.is-kata .fighter .ftotal{display:none}
+.kpanel,.tpanel{display:flex;flex-direction:column;gap:12px}
+.kpanel .ktitle{font-size:16px}
+.krow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.krow label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700;padding-left:10px}
+.ka{border-left:4px solid var(--aka)}.kb{border-left:4px solid var(--ao)}
+.tmctl .ka,.tmctl .kb{padding-left:8px}
+.kgrid table{width:100%;border-collapse:separate;border-spacing:6px 6px}
+.kgrid th{font-size:12px;color:var(--muted);font-weight:700;text-align:center}
+.kgrid td{text-align:center}
+.kgrid td.kside{font-weight:850;text-align:left;width:56px;font-stretch:var(--cond);font-size:16px}
+.kgrid td.kside.a{color:var(--aka)}.kgrid td.kside.b{color:var(--ao)}
+.kgrid input{width:100%;min-width:58px;text-align:center;font-size:18px;font-weight:700;padding:8px 4px}
+.kgrid input.bad{border-color:#e11d48;background:#fff1f2}
+.kflag{width:100%;min-width:58px;height:46px;border-radius:10px;border:2px solid #d5dbe4;background:#fff;font-weight:850;font-size:14px;cursor:pointer;color:#8a93a3}
+.kflag.a.on{background:var(--aka);border-color:var(--aka);color:#fff}
+.kflag.b.on{background:var(--ao);border-color:var(--ao);color:#fff}
+.kvote{display:inline-block;min-width:40px;padding:3px 8px;border-radius:99px;font-size:12px;font-weight:800;background:#eef1f5;color:#8a93a3}
+.kvote.a{background:var(--aka);color:#fff}.kvote.b{background:var(--ao);color:#fff}
+.kdec{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#f4f6f9;border-radius:var(--r-ctl);padding:10px 14px}
+.kdec #kDec{font-size:17px;font-weight:700}
+.kdec .wa{color:var(--aka)}.kdec .wb{color:var(--ao)}
+.tscore{display:flex;align-items:center;justify-content:center;gap:16px;font-size:20px;font-weight:800;flex-wrap:wrap}
+.tscore .ta{color:var(--aka)}.tscore .tb{color:var(--ao)}
+.tscore .num{font-size:40px;font-stretch:var(--cond);background:var(--ink);color:#fff;border-radius:10px;padding:0 14px;line-height:1.25}
+.tscore small{display:block;font-size:12px;color:var(--muted);font-weight:600;text-align:center}
+.tmbouts{width:100%}
+.tmbouts td.res{text-align:center;font-weight:800}
+.badge.disc-kata,.badge.disc-kata_team{background:#ede9fe;color:#5b21b6}
+.badge.disc-kumite_team{background:#ffedd5;color:#9a3412}
+.is-kata .d-win{top:88%}
+.is-kata .timercard .hint{display:none}
+.d-board{grid-template-columns:minmax(0,1fr)}
+.d-top .d-team{min-width:0;overflow:hidden}
+.d-team .a,.d-team .b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.d-team b,.d-team small{flex:none}
+.krow input,.kgrid input{border:1px solid var(--line);border-radius:8px;background:#fff}
+.krow input{padding:9px 11px;font-size:16px;font-weight:600}
+.kpanel .ctools select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}

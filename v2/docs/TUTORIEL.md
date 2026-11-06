@@ -10,6 +10,7 @@ Ce guide suit un tournoi de démonstration du début à la fin : la **Coupe de N
 4. [Se connecter à un tournoi](#4-se-connecter-à-un-tournoi)
 5. [Préparer le tournoi (organisation)](#5-préparer-le-tournoi-organisation)
 6. [Le jour J : la table de marque](#6-le-jour-j--la-table-de-marque)
+   - [6 bis. Kata, kata par équipe et kumite par équipe](#6-bis-kata-kata-par-équipe-et-kumite-par-équipe)
 7. [Suivre tous les tatamis (organisation)](#7-suivre-tous-les-tatamis-organisation)
 8. [La page publique](#8-la-page-publique)
 9. [Résultats et exports](#9-résultats-et-exports)
@@ -278,6 +279,77 @@ La pastille en haut passe à **Hors ligne**, avec le nombre de résultats en att
 ![Table hors ligne avec un résultat en attente](img/30-table-hors-ligne.png)
 
 > Ne fermez pas la page et ne vous déconnectez pas tant que des résultats sont « en attente ».
+
+---
+
+## 6 bis. Kata, kata par équipe et kumite par équipe
+
+En plus du kumite individuel, chaque pool peut être d'une autre **discipline** : *Kata individuel*, *Kata par équipe* ou *Kumite par équipe*.
+
+### Créer les équipes
+
+Dans **Compétiteurs**, sous la liste, la section **Équipes** sert aux deux disciplines par équipe. Cliquez **Nouvelle équipe**, donnez un nom, choisissez le **type** (Kata ou Kumite), le dojo, le sexe (ou *Mixte*), puis cochez les membres parmi les compétiteurs. Par défaut, seuls les compétiteurs du même dojo sont proposés.
+
+![Créer une équipe](img/39-orga-equipe.png)
+
+Une équipe **Kata** ne peut aller que dans un pool *Kata par équipe*, une équipe **Kumite** que dans un pool *Kumite par équipe*. Un même compétiteur peut faire partie d'une équipe et concourir en individuel.
+
+Règles WKF pour la composition : en kata, 3 athlètes (4 avec un remplaçant) du même sexe ; en kumite, 5 combats chez les hommes (3 athlètes minimum) et 3 chez les femmes (2 minimum).
+
+### Créer un pool de kata
+
+Dans **Pools → Nouveau pool**, choisissez la **Discipline** en premier. Pour le kata, choisissez ensuite **comment le kata sera jugé** :
+
+| Jugement | Saisie à la table | Comment le vainqueur est désigné |
+|---|---|---|
+| **Notes → vote de chaque juge (WKF 2026)** | une note de 5,0 à 10,0 par juge et par performance | chaque juge vote pour la performance à qui il a donné la meilleure note ; la majorité des votes l'emporte. Seuls les votes sont affichés. |
+| **Drapeaux** | le drapeau levé par chaque juge (rouge AKA / bleu AO) | majorité des drapeaux |
+| **Notes additionnées** | une note de 5,0 à 10,0 par juge et par performance | on retire la note la plus haute et la plus basse (2 et 2 avec 7 juges), on additionne ; en cas d'égalité, on compare la note la plus basse retirée, puis la plus haute |
+
+Choisissez aussi le nombre de juges (3, 5 ou 7) et, si vous le voulez, un **chronomètre** (coché par défaut en kata par équipe : kata + bunkai doivent tenir en 5 minutes). Les critères d'âge, de poids et de grade fonctionnent comme en kumite. Pour un pool *par équipe*, les critères sont le sexe et la catégorie de l'équipe.
+
+![Pool de kata](img/40-orga-pool-kata.png)
+
+### La table de marque en kata
+
+Quand un pool de kata est sur le tatami, les boutons de score sont remplacés par le panneau **Décision des juges**. Saisissez les noms des katas présentés (une liste de katas connus est proposée), puis la décision de chaque juge :
+
+- **Drapeaux** : cliquez AKA ou AO sous chaque juge.
+- **Notes** : tapez les notes (la touche **Entrée** passe à la case suivante). En mode WKF 2026, la ligne *Vote* montre pour qui chaque juge vote ; un juge qui donne la même note aux deux doit les départager.
+
+![Table de marque – kata aux drapeaux](img/41-table-kata-drapeaux.png)
+
+La ligne du bas calcule la décision. Tant que vous n'avez pas cliqué **Annoncer la décision**, l'écran TV n'affiche que les noms et les katas. L'annonce montre les votes (ou les points) et le vainqueur ; ensuite, **Terminer le tour ▶ suivant** enregistre le résultat et appelle les suivants. En cas d'égalité (possible avec les notes additionnées), désignez le vainqueur avec **Déclarer vainqueur**.
+
+![Écran TV – kata aux drapeaux](img/42-ecran-kata-drapeaux.png)
+
+![Table de marque – notes et votes des juges](img/43-table-kata-notes-votes.png)
+
+![Écran TV – votes des juges](img/44-ecran-kata-votes.png)
+
+Le classement d'un pool de kata se fait aux victoires, puis à la confrontation directe, puis au total des votes (ou des notes).
+
+### Kumite par équipe
+
+Dans le pool, choisissez *Kumite par équipe*, le **mode des combats** (WKF en général) et le **nombre de combats par rencontre** (5 pour les hommes, 3 pour les femmes, proposé automatiquement selon le sexe choisi).
+
+![Pool de kumite par équipe](img/45-orga-pool-kumite-equipe.png)
+
+À la table, une rencontre se déroule ainsi :
+
+1. Les deux équipes sont appelées (écran *Appel* avec la liste des membres).
+2. Dans le panneau de l'équipe, choisissez les deux combattants du combat et cliquez **Charger ce combat**. Les membres qui ont déjà combattu sont grisés.
+3. Arbitrez le combat comme d'habitude (score, pénalités, senshu, chrono), puis **Déclarer vainqueur** et **Enregistrer le combat**. Si les scores sont égaux sans senshu, cliquez **Hikiwake** (égalité).
+4. Si une équipe n'a plus de combattant, choisissez *Pas de combattant (forfait)* : l'adversaire gagne 8 – 0 (kiken).
+5. Quand le vainqueur de la rencontre est connu, cliquez **Terminer la rencontre**.
+
+![Table de marque – rencontre par équipe](img/46-table-kumite-equipe.png)
+
+L'équipe qui gagne le plus de combats l'emporte, puis celle qui a marqué le plus de points. En cas d'égalité parfaite en tableau, un **combat décisif** est proposé (un membre désigné par chaque équipe, Hantei si égalité). En poule, une égalité parfaite donne un match nul. Le classement de la poule compte alors 3 points par victoire et 1 par nul. L'écran TV montre en haut le score de la rencontre.
+
+![Écran TV – rencontre par équipe](img/47-ecran-kumite-equipe.png)
+
+Les diplômes d'un pool par équipe sont imprimés **un par membre**, avec le nom de l'équipe sous le nom.
 
 ---
 

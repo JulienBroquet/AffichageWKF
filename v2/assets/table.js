@@ -19,6 +19,7 @@ setSoundFileSource(kind => soundFiles[kind]);
 /* ---------- état local ---------- */
 state = normalizeState(load(STORE_STATE, null));
 state.tatami = `Tatami ${TAT}`;
+if (state.mode === 'kata' && !state.kata) state.kata = newKata();
 const cache = Object.assign({ rev: 0, tournament: null, pools: {}, outbox: [], settingsSig: '' }, load(STORE_CACHE, {}));
 // cache.pools : { id: { version, data } } – uniquement les pools de ce tatami
 if (state.pool && cache.pools[state.pool.id]) cache.pools[state.pool.id].data = state.pool;   // un seul objet
@@ -40,12 +41,16 @@ function commit(){
   render();
 }
 function snapshot(){
-  history.push(JSON.stringify({ aka:state.aka, ao:state.ao, winner:state.winner }));
+  history.push(JSON.stringify({ aka:state.aka, ao:state.ao, winner:state.winner, kata:state.kata || null, team:state.team || null }));
   if (history.length > 100) history.shift();
 }
 function undo(){
   const h = history.pop(); if (!h) return;
-  Object.assign(state, JSON.parse(h)); commit();
+  const o = JSON.parse(h);
+  Object.assign(state, o);
+  if (!o.kata) delete state.kata;
+  if (!o.team) delete state.team;
+  commit();
 }
 function callText(){
   const pool = state.pool, m = pool && pool.current >= 0 ? pool.matches[pool.current] : null;
@@ -218,7 +223,11 @@ function render(){
     $('cPhase').textContent = (s.mode==='k4x15'?'Assaut ':'Échange ') + (s.phase+1) + '/' + ph.length + ' · ' + who + ' ' + what + (counter ? ' – ' + counter : '');
     $('prevPhase').disabled = s.phase === 0;
     $('nextPhase').disabled = s.phase >= ph.length-1;
-  } else $('cPhase').textContent = 'Kumite WKF · ' + fmt(totalMs());
+  } else if (s.mode === 'kata') $('cPhase').textContent = `Kata · ${KATA_SHORT[(s.kata || {}).system || 'votes']} · ${(s.kata || {}).judges || 5} juges` + (timerOn() ? ' · ' + fmt(totalMs()) : '');
+  else $('cPhase').textContent = (s.team ? 'Kumite par équipe · ' : 'Kumite WKF · ') + fmt(totalMs());
+  $('control').classList.toggle('is-kata', s.mode === 'kata');
+  renderKata();
+  renderTeam();
   preview.render();
   renderPool();
   renderNet();
@@ -236,6 +245,7 @@ function render(){
 /* ---------- barre du haut, boutons du chrono ---------- */
 $('mode').addEventListener('change', e => {
   state.mode = e.target.value; state.phase = 0; alertMsg = '';
+  if (state.mode === 'kata' && !state.kata) state.kata = newKata();
   state.timer = { running:false, remaining:totalMs(), endAt:0 };
   commit();
 });
@@ -267,6 +277,8 @@ $('newMatch').addEventListener('click', () => {
   if (!confirm('Démarrer un nouveau combat ? Scores, pénalités, noms et chrono seront remis à zéro.')) return;
   if (state.pool) state.pool.current = -1;
   state.aka = fighter(); state.ao = fighter(); state.winner = null; state.phase = 0; alertMsg = ''; history = [];
+  if (state.kata) state.kata = newKata(state.kata);
+  delete state.team;
   state.timer = { running:false, remaining:totalMs(), endAt:0 };
   commit();
 });
@@ -277,7 +289,7 @@ document.addEventListener('keydown', e => {
   const k = e.key.toLowerCase(), d = e.shiftKey ? -1 : 1;
   const map = { a:['aka','yuko'], s:['aka','waza'], d:['aka','ippon'], j:['ao','yuko'], k:['ao','waza'], l:['ao','ippon'] };
   if (e.code === 'Space'){ e.preventDefault(); toggleTimer(); }
-  else if (map[k]) { e.preventDefault(); addScore(map[k][0], map[k][1], d); }
+  else if (map[k] && state.mode !== 'kata') { e.preventDefault(); addScore(map[k][0], map[k][1], d); }
   else if (k === 'n') setPhase(state.phase+1);
 });
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
@@ -298,6 +310,173 @@ $('testEnd').addEventListener('click', () => playSound('end'));
 $('testCall').addEventListener('click', () => doCall());
 $('flCall').addEventListener('click', () => doCall());
 
+/* ---------- kata : saisie des juges ---------- */
+const KATA_LIST = ['Heian Shodan','Heian Nidan','Heian Sandan','Heian Yondan','Heian Godan','Pinan Shodan','Pinan Nidan','Pinan Sandan','Pinan Yondan','Pinan Godan',
+  'Tekki Shodan','Tekki Nidan','Bassai Dai','Bassai Sho','Kanku Dai','Kanku Sho','Jion','Jitte','Enpi','Hangetsu','Gankaku','Chinte','Sochin','Nijushiho','Unsu','Gojushiho Dai','Gojushiho Sho',
+  'Seienchin','Saifa','Seipai','Sanseiru','Shisochin','Kururunfa','Suparinpei','Seisan','Sanchin','Tensho','Chatanyara Kushanku','Kosokun Dai','Matsumura Bassai','Anan','Paiku','Heiku','Pachu','Ohan',
+  'Kushanku','Wanshu','Rohai','Naihanchi','Chinto','Niseishi','Seishan','Passai','Koryu Bassai','Aoyagi','Annan','Papuren','Unshu','Kanku','Tomari Bassai'];
+$('kataNames').innerHTML = KATA_LIST.map(k => `<option value="${k}">`).join('');
+let kGridSig = '';
+function renderKata(){
+  const on = state.mode === 'kata';
+  $('kataPanel').hidden = !on;
+  if (!on) return;
+  const K = fixKata(state.kata || (state.kata = newKata()));
+  $('kSys').value = K.system; $('kJudges').value = K.judges; $('kTimer').checked = !!K.timer;
+  if (document.activeElement !== $('kKataA')) $('kKataA').value = K.kataA || '';
+  if (document.activeElement !== $('kKataB')) $('kKataB').value = K.kataB || '';
+  const J = [...Array(K.judges).keys()];
+  const sig = K.system + K.judges;
+  if (sig !== kGridSig){
+    kGridSig = sig;
+    const head = `<tr><th></th>${J.map(j => `<th>Juge ${j+1}</th>`).join('')}</tr>`;
+    if (K.system === 'flags')
+      $('kGrid').innerHTML = `<table>${head}<tr><td class="kside">Drapeau</td>${J.map(j => `<td><div style="display:flex;gap:6px"><button class="kflag a" data-flag="${j}" data-v="aka">AKA</button><button class="kflag b" data-flag="${j}" data-v="ao">AO</button></div></td>`).join('')}</tr></table>`;
+    else
+      $('kGrid').innerHTML = `<table>${head}
+        <tr><td class="kside a">AKA</td>${J.map(j => `<td><input type="number" inputmode="decimal" min="5" max="10" step="0.1" data-ks="sa" data-j="${j}"></td>`).join('')}</tr>
+        <tr><td class="kside b">AO</td>${J.map(j => `<td><input type="number" inputmode="decimal" min="5" max="10" step="0.1" data-ks="sb" data-j="${j}"></td>`).join('')}</tr>
+        ${K.system === 'votes' ? `<tr><td class="kside">Vote</td>${J.map(j => `<td><span class="kvote" data-kv="${j}">–</span></td>`).join('')}</tr>` : ''}</table>`;
+  }
+  const d = kataDecision(K);
+  $('kGrid').querySelectorAll('[data-flag]').forEach(b => b.classList.toggle('on', K.flags[+b.dataset.flag] === b.dataset.v));
+  $('kGrid').querySelectorAll('[data-ks]').forEach(inp => {
+    const v = K[inp.dataset.ks][+inp.dataset.j];
+    if (document.activeElement !== inp) inp.value = v == null ? '' : v;
+    inp.classList.toggle('bad', v != null && !validScore(v));
+  });
+  $('kGrid').querySelectorAll('[data-kv]').forEach(el => { const v = d.votes[+el.dataset.kv]; el.className = 'kvote' + (v === 'aka' ? ' a' : v === 'ao' ? ' b' : ''); el.textContent = v ? v.toUpperCase() : (validScore(K.sa[+el.dataset.kv]) && validScore(K.sb[+el.dataset.kv]) ? 'égalité !' : '–'); });
+  const missing = K.system === 'flags' ? K.flags.filter(f => !f).length : J.filter(j => !(validScore(K.sa[j]) && validScore(K.sb[j]))).length;
+  const sc = K.system === 'scores' ? (d.complete ? `AKA <b>${fmtPts(d.ta)}</b> – <b>${fmtPts(d.tb)}</b> AO` : '') : `AKA <b>${d.va}</b> – <b>${d.vb}</b> AO`;
+  let txt;
+  if (!d.complete) txt = `${sc ? sc + ' · ' : ''}<span class="muted">${missing ? `${missing} juge${missing > 1 ? 's' : ''} à saisir` : 'chaque juge doit départager les deux performances'}</span>`;
+  else if (d.winner) txt = `${sc} · Vainqueur : <span class="${d.winner === 'aka' ? 'wa' : 'wb'}">${d.winner.toUpperCase()}</span>`;
+  else txt = `${sc} · <b>Égalité</b> – désignez le vainqueur avec « Déclarer vainqueur »`;
+  if (state.winner && d.winner && state.winner !== d.winner) txt += ' · <b style="color:#b45309">vainqueur déclaré différent</b>';
+  $('kDec').innerHTML = txt;
+  $('kReveal').textContent = K.reveal ? 'Masquer la décision' : 'Annoncer la décision';
+  $('kReveal').classList.toggle('dark', K.reveal);
+}
+$('kGrid').addEventListener('click', e => {
+  const b = e.target.closest('[data-flag]'); if (!b) return;
+  snapshot(); const K = state.kata, j = +b.dataset.flag;
+  K.flags[j] = K.flags[j] === b.dataset.v ? null : b.dataset.v; commit();
+});
+$('kGrid').addEventListener('change', e => {
+  const inp = e.target.closest('[data-ks]'); if (!inp) return;
+  snapshot();
+  const raw = inp.value.replace(',', '.').trim();
+  state.kata[inp.dataset.ks][+inp.dataset.j] = raw === '' ? null : num1(raw);
+  commit();
+});
+$('kGrid').addEventListener('keydown', e => {   // Entrée = case suivante
+  const inp = e.target.closest('[data-ks]'); if (!inp || e.key !== 'Enter') return;
+  e.preventDefault(); inp.dispatchEvent(new Event('change', { bubbles: true }));
+  const all = [...$('kGrid').querySelectorAll('[data-ks]')], i = all.indexOf(inp);
+  const order = all.slice().sort((x, y) => (+x.dataset.j - +y.dataset.j) || (x.dataset.ks < y.dataset.ks ? -1 : 1));
+  const nx = order[order.indexOf(inp) + 1]; if (nx) nx.focus(); else inp.blur();
+  void i;
+});
+$('kSys').addEventListener('change', e => { snapshot(); state.kata.system = e.target.value; state.kata.reveal = false; commit(); });
+$('kJudges').addEventListener('change', e => { snapshot(); state.kata.judges = +e.target.value; fixKata(state.kata); state.kata.reveal = false; commit(); });
+$('kTimer').addEventListener('change', e => { state.kata.timer = e.target.checked; if (!state.timer.running) state.timer = { running:false, remaining:totalMs(), endAt:0 }; commit(); });
+$('kKataA').addEventListener('input', e => { state.kata.kataA = e.target.value; commit(); });
+$('kKataB').addEventListener('input', e => { state.kata.kataB = e.target.value; commit(); });
+$('kClear').addEventListener('click', () => {
+  if (!confirm('Effacer toutes les décisions des juges pour ce tour ?')) return;
+  snapshot(); const K = state.kata; Object.assign(K, newKata(K), { kataA: K.kataA, kataB: K.kataB }); state.winner = null; commit();
+});
+$('kReveal').addEventListener('click', () => {
+  const K = state.kata, d = kataDecision(K);
+  if (!K.reveal && !d.complete && !confirm('Toutes les décisions ne sont pas saisies. Annoncer quand même ?')) return;
+  snapshot();
+  K.reveal = !K.reveal;
+  if (K.reveal && d.winner) state.winner = d.winner;
+  if (K.reveal && state.screen !== 'score') state.screen = 'score';
+  commit();
+});
+
+/* ---------- kumite par équipe : combats individuels ---------- */
+function renderTeam(){
+  const T = state.team;
+  $('teamPanel').hidden = !T;
+  if (!T) return;
+  const t = teamTally(T, T.rr), extra = t.needExtra;
+  const n = T.bouts.filter(b => !b.extra).length;
+  $('tmScore').innerHTML = `<span class="ta">${esc(T.nameA)}</span><span><span class="num">${t.wa}</span><small>${t.pa} pt${t.pa > 1 ? 's' : ''}</small></span>
+    <span><span class="num">${t.wb}</span><small>${t.pb} pt${t.pb > 1 ? 's' : ''}</small></span><span class="tb">${esc(T.nameB)}</span>`;
+  const used = (side) => new Set(T.bouts.filter(b => !b.extra).map(b => side === 'a' ? b.ia : b.ib));
+  const opts = (list, u, cur) => {
+    const free = m => extra || !u.has(m.id);
+    if (!cur || (cur !== '__ff' && !list.some(m => m.id === cur && free(m)))) cur = (list.find(free) || { id: '__ff' }).id;
+    return list.map(m => `<option value="${m.id}" ${cur === m.id ? 'selected' : ''} ${free(m) ? '' : 'disabled'}>${esc(m.name)}${free(m) ? '' : ' (a déjà combattu)'}</option>`).join('')
+      + (extra ? '' : `<option value="__ff" ${cur === '__ff' ? 'selected' : ''}>Pas de combattant (forfait)</option>`);
+  };
+  if (document.activeElement !== $('tmA')) $('tmA').innerHTML = opts(T.membersA, used('a'), T.cur ? T.cur.ia : $('tmA').value);
+  if (document.activeElement !== $('tmB')) $('tmB').innerHTML = opts(T.membersB, used('b'), T.cur ? T.cur.ib : $('tmB').value);
+  const loaded = !!T.cur;
+  $('tmBoutN').textContent = t.done ? 'Rencontre décidée' : extra ? 'Combat décisif' : `Combat ${Math.min(n + 1, T.n)} / ${T.n}`;
+  $('tmA').disabled = $('tmB').disabled = loaded || t.done;
+  $('tmLoad').hidden = loaded || t.done;
+  $('tmRecord').hidden = !loaded; $('tmDraw').hidden = !loaded || extra;
+  let msg = '';
+  if (t.done) msg = t.draw ? 'Match nul (même nombre de victoires et de points). Cliquez « Terminer la rencontre ».' : `${t.winner === 'aka' ? T.nameA : T.nameB} remporte la rencontre${t.early ? ' (victoire acquise, les combats restants ne sont pas nécessaires' + (T.rr ? ' – en poule, la WKF les fait quand même disputer' : '') + ')' : ''}. Cliquez « Terminer la rencontre ».`;
+  else if (extra) msg = 'Égalité de victoires et de points : chaque équipe désigne un de ses membres pour un combat décisif. En cas d\'égalité, décision par Hantei (« Déclarer vainqueur »).';
+  else if (loaded) msg = 'Combat en cours : utilisez les boutons de score ci-dessous, déclarez le vainqueur puis « Enregistrer le combat ».';
+  $('tmMsg').hidden = !msg; $('tmMsg').textContent = msg;
+  $('tmBouts').innerHTML = T.bouts.map((b, i) => `<tr><td>${b.extra ? 'Décisif' : i + 1}</td><td class="${b.winner === 'aka' ? 'wa' : ''}">${esc(b.an)}${b.senshu === 'aka' ? ' <small>(S)</small>' : ''}</td><td class="res">${b.sa} – ${b.sb}</td>
+    <td class="${b.winner === 'ao' ? 'wb' : ''}">${esc(b.bn)}${b.senshu === 'ao' ? ' <small>(S)</small>' : ''}</td><td>${b.winner === 'draw' ? 'Hikiwake' : (b.winner === 'aka' ? 'AKA' : 'AO') + (b.kiken ? ' (kiken)' : '')}</td>
+    <td class="acts">${i === T.bouts.length - 1 && !loaded ? '<button class="btn sm" data-tmdel title="Annuler ce combat">✕</button>' : ''}</td></tr>`).join('')
+    || '<tr><td colspan="6" class="empty">Choisissez les deux combattants du premier combat puis « Charger ce combat ».</td></tr>';
+}
+$('tmLoad').addEventListener('click', () => {
+  const T = state.team; if (!T) return;
+  const ia = $('tmA').value, ib = $('tmB').value;
+  if (!ia || !ib){ alert('Choisissez un combattant pour chaque équipe.'); return; }
+  if (ia === '__ff' || ib === '__ff'){
+    if (ia === '__ff' && ib === '__ff'){ alert('Au moins une des deux équipes doit présenter un combattant.'); return; }
+    // combattant absent : KIKEN, victoire de l'adversaire 8 – 0
+    const a = T.membersA.find(m => m.id === ia), b = T.membersB.find(m => m.id === ib);
+    if (!confirm(`Enregistrer un forfait (Kiken) : victoire ${ia === '__ff' ? 'AO' : 'AKA'} 8 – 0 ?`)) return;
+    snapshot();
+    T.bouts.push({ ia, ib, an: a ? a.name : '(forfait)', bn: b ? b.name : '(forfait)', sa: ia === '__ff' ? 0 : 8, sb: ia === '__ff' ? 8 : 0,
+      winner: ia === '__ff' ? 'ao' : 'aka', senshu: null, extra: false, kiken: true });
+    commit(); return;
+  }
+  const a = T.membersA.find(m => m.id === ia), b = T.membersB.find(m => m.id === ib);
+  T.cur = { ia, ib };
+  state.aka = Object.assign(fighter(), { name: a.name, dojo: T.nameA });
+  state.ao  = Object.assign(fighter(), { name: b.name, dojo: T.nameB });
+  state.winner = null; state.phase = 0; history = []; alertMsg = '';
+  state.timer = { running:false, remaining:totalMs(), endAt:0 }; lastRem = null;
+  state.screen = 'score';
+  commit();
+});
+function recordBout(draw){
+  const T = state.team; if (!T || !T.cur) return;
+  const extra = teamTally(T, T.rr).needExtra;
+  if (draw){
+    if (total(state.aka) !== total(state.ao) || state.aka.senshu || state.ao.senshu){ alert('Hikiwake seulement si les scores sont égaux et sans senshu.'); return; }
+  } else if (!state.winner){ alert(extra ? 'Désignez le vainqueur du combat décisif (Hantei si égalité) avec « Déclarer vainqueur ».' : 'Déclarez le vainqueur du combat (ou « Hikiwake » en cas d\'égalité).'); return; }
+  if (state.timer.running){ state.timer.remaining = remainingNow(); state.timer.running = false; }
+  snapshot();
+  T.bouts.push({ ia: T.cur.ia, ib: T.cur.ib, an: state.aka.name, bn: state.ao.name, sa: total(state.aka), sb: total(state.ao),
+    winner: draw ? 'draw' : state.winner, senshu: state.aka.senshu ? 'aka' : state.ao.senshu ? 'ao' : null, extra,
+    aka: clone(state.aka), ao: clone(state.ao) });
+  T.cur = null;
+  state.aka = Object.assign(fighter(), { name: T.nameA }); state.ao = Object.assign(fighter(), { name: T.nameB });
+  state.winner = null; alertMsg = '';
+  state.timer = { running:false, remaining:totalMs(), endAt:0 }; lastRem = null;
+  commit();
+}
+$('tmRecord').addEventListener('click', () => recordBout(false));
+$('tmDraw').addEventListener('click', () => recordBout(true));
+$('tmBouts').addEventListener('click', e => {
+  if (!e.target.closest('[data-tmdel]')) return;
+  if (!confirm('Annuler le dernier combat enregistré ?')) return;
+  snapshot(); state.team.bouts.pop(); commit();
+});
+
 /* ---------- pools du tatami ---------- */
 function nextPool(){
   const list = poolList(), i = list.indexOf(state.pool);
@@ -309,7 +488,9 @@ function activatePool(p){
       && !confirm('Un combat est en cours sur le pool actuel. Le quitter sans enregistrer ?')) return;
   if (state.pool && state.pool !== p) state.pool.current = -1;
   if ((p.participants || []).length < 2){ alert('Ce pool contient moins de 2 compétiteurs.'); return; }
-  state.pool = p; state.mode = p.mode || state.mode; state.category = p.name; state.phase = 0;
+  state.pool = p; state.mode = isKataDisc(p) ? 'kata' : (p.mode || state.mode); state.category = p.name; state.phase = 0;
+  if (isKataDisc(p)) state.kata = newKata(p.kata); else delete state.kata;
+  delete state.team;
   state.screen = p.format === 'ko' ? 'bracket' : 'list';
   state.aka = fighter(); state.ao = fighter(); state.winner = null; history = []; alertMsg = '';
   state.timer = { running:false, remaining:totalMs(), endAt:0 }; lastRem = null;
@@ -322,6 +503,11 @@ function loadMatch(i){
   state.aka = Object.assign(fighter(), { name:A.name, dojo:A.dojo });
   state.ao  = Object.assign(fighter(), { name:B.name, dojo:B.dojo });
   state.winner = null; state.phase = 0; history = []; alertMsg = '';
+  if (isKataDisc(pool)){ state.mode = 'kata'; state.kata = newKata(Object.assign({}, pool.kata, state.kata ? { system: state.kata.system, judges: state.kata.judges, timer: state.kata.timer } : {})); }
+  if (discOf(pool) === 'kumite_team'){
+    state.team = { nameA: A.name, nameB: B.name, membersA: clone(A.members || []), membersB: clone(B.members || []),
+      n: pool.bouts || 3, rr: pool.format !== 'ko', bouts: [], cur: null };
+  } else delete state.team;
   state.timer = { running:false, remaining:totalMs(), endAt:0 }; lastRem = null;
   state.screen = 'callup';
   commit();
@@ -329,14 +515,33 @@ function loadMatch(i){
 }
 function finishMatch(){
   const pool = state.pool; if (!pool || pool.current < 0) return;
-  if (!state.winner){ alertMsg = 'Déclarez le vainqueur (bouton « Déclarer vainqueur ») avant de terminer le combat.'; render(); return; }
-  if (state.timer.running){ state.timer.remaining = remainingNow(); state.timer.running = false; }
   const cur = pool.matches[pool.current];
   const A = pool.participants[cur.a], B = pool.participants[cur.b];
-  cur.res = { winner:state.winner, sa:total(state.aka), sb:total(state.ao), aka:clone(state.aka), ao:clone(state.ao), mode:state.mode };
+  let res;
+  if (state.team){
+    const T = state.team, t = teamTally(T, T.rr);
+    if (T.cur){ alertMsg = 'Enregistrez d\'abord le combat individuel en cours (« Enregistrer le combat »).'; render(); return; }
+    if (!t.done){ alertMsg = t.needExtra ? 'Égalité parfaite : un combat décisif est nécessaire (une personne désignée par équipe).' : `La rencontre n'est pas terminée (${t.played}/${T.n} combats).`; render(); return; }
+    if (t.early && T.rr && !confirm(`L'équipe ${t.winner === 'aka' ? T.nameA : T.nameB} a déjà gagné. En poule, la WKF fait disputer tous les combats. Terminer quand même la rencontre maintenant ?`)) return;
+    res = { winner: t.draw ? 'draw' : t.winner, sa: t.wa, sb: t.wb, pa: t.pa, pb: t.pb, bouts: clone(T.bouts), mode: state.mode,
+      aka: Object.assign(fighter(), { name: T.nameA }), ao: Object.assign(fighter(), { name: T.nameB }) };
+    state.winner = res.winner === 'draw' ? null : res.winner;
+  } else if (state.mode === 'kata'){
+    const K = state.kata, d = kataDecision(K);
+    if (!state.winner && d && d.winner) state.winner = d.winner;
+    if (!state.winner){ alertMsg = d && d.tie ? 'Égalité : désignez le vainqueur (« Déclarer vainqueur ») après départage.' : 'Saisissez la décision de tous les juges (ou désignez le vainqueur) avant de terminer.'; render(); return; }
+    K.reveal = true;
+    const sa = K.system === 'scores' ? (d.ta ?? 0) : d.va, sb = K.system === 'scores' ? (d.tb ?? 0) : d.vb;
+    res = { winner: state.winner, sa, sb, kata: clone(K), mode: 'kata', aka: { name: state.aka.name, kata: K.kataA }, ao: { name: state.ao.name, kata: K.kataB } };
+  } else {
+    if (!state.winner){ alertMsg = 'Déclarez le vainqueur (bouton « Déclarer vainqueur ») avant de terminer le combat.'; render(); return; }
+    res = { winner:state.winner, sa:total(state.aka), sb:total(state.ao), aka:clone(state.aka), ao:clone(state.ao), mode:state.mode };
+  }
+  if (state.timer.running){ state.timer.remaining = remainingNow(); state.timer.running = false; }
+  cur.res = res;
   const record = { rid: uid() + Date.now().toString(36), pool_id: pool.id, pool_name: pool.name, label: matchLabel(pool, cur),
-    aka: A.name, aka_dojo: A.dojo, ao: B.name, ao_dojo: B.dojo, sa: cur.res.sa, sb: cur.res.sb, winner: state.winner,
-    detail: { aka: cur.res.aka, ao: cur.res.ao, mode: state.mode } };
+    aka: A.name, aka_dojo: A.dojo, ao: B.name, ao_dojo: B.dojo, sa: res.sa, sb: res.sb, winner: res.winner,
+    detail: { aka: res.aka, ao: res.ao, mode: res.mode, discipline: discOf(pool), kata: res.kata || undefined, bouts: res.bouts || undefined } };
   if (pool.format === 'ko') koRebuild(pool);
   pool.current = pool.matches.indexOf(cur);
   enqueue(pool.id, record);
@@ -345,6 +550,7 @@ function finishMatch(){
   else {
     pool.current = -1; state.screen = 'ranking';
     state.aka = fighter(); state.ao = fighter(); state.winner = null; history = []; alertMsg = '';
+    delete state.team; if (state.kata) state.kata = newKata(state.kata);
     state.timer = { running:false, remaining:totalMs(), endAt:0 };
     commit();
   }
@@ -361,7 +567,7 @@ $('pUnload').addEventListener('click', () => {
   const pool = state.pool; if (!pool) return;
   if (pool.current >= 0 && (total(state.aka) || total(state.ao) || state.timer.running) && !confirm('Un combat est en cours. Le quitter sans enregistrer ?')) return;
   pool.current = -1; state.pool = null; state.screen = 'score';
-  state.aka = fighter(); state.ao = fighter(); state.winner = null; history = [];
+  state.aka = fighter(); state.ao = fighter(); state.winner = null; history = []; delete state.team;
   commit();
 });
 $('pvMatches').addEventListener('click', e => {
@@ -385,8 +591,8 @@ function renderPool(){
     const [cls, lbl] = st[status];
     const active = state.pool === p;
     return `<div class="pcard ${active ? 'active' : ''}">
-      <div class="pc-top"><b>${esc(p.name)}</b><span class="badge">${MODES[p.mode]}</span></div>
-      <div class="pc-meta">${N} compétiteur${N>1?'s':''} · ${p.format === 'ko' ? (p.repechage ? 'Tableau + repêchage' : 'Tableau') : `Poule, ${M} combat${M>1?'s':''}`}</div>
+      <div class="pc-top"><b>${esc(p.name)}</b><span class="badge disc-${discOf(p)}">${DISC_SHORT[discOf(p)]}</span><span class="badge">${isKataDisc(p) ? KATA_SHORT[(p.kata || {}).system || 'votes'] : MODES[p.mode]}</span></div>
+      <div class="pc-meta">${unitWord(p, N)} · ${p.format === 'ko' ? (p.repechage ? 'Tableau + repêchage' : 'Tableau') : `Poule, ${M} ${matchWord(p)}`}</div>
       <div class="pc-crit">${esc(critSummary(p))}</div>
       <div><span class="st ${cls}">${lbl}${status !== 'ready' ? ` ${done}/${M}` : ''}</span></div>
       <div class="pc-acts">${active ? '<span class="st now">Sur le tatami</span>' : `<button class="btn sm dark" data-pact="activate" data-pid="${p.id}" ${N < 2 ? 'disabled' : ''}>▶ Sur le tatami</button>`}</div>
@@ -398,7 +604,7 @@ function renderPool(){
   $('poolView').hidden = !pool;
   if (!pool) return;
   const RM = realMatches(pool), N = RM.length, done = RM.filter(m => m.res).length, allDone = poolDone(pool);
-  $('flTitle').textContent = `Pool : ${pool.name} · ${done}/${N} combats terminés`;
+  $('flTitle').textContent = `Pool : ${pool.name} · ${done}/${N} ${matchWord(pool)} ${isTeamDisc(pool) ? 'terminées' : 'terminés'}`;
   if (pool.current >= 0){
     const m = pool.matches[pool.current];
     $('flMatch').innerHTML = `${matchLabel(pool, m)} : <span class="wa">${esc(pool.participants[m.a].name)}</span> contre <span class="wb">${esc(pool.participants[m.b].name)}</span>`;
@@ -414,11 +620,15 @@ function renderPool(){
   $('flHajime').hidden = pool.current < 0 || scr === 'score';
   $('flCall').hidden = pool.current < 0;
   $('flFinish').hidden = pool.current < 0;
-  $('flFinish').textContent = nextUnplayed(pool, pool.current) >= 0 ? 'Terminer le combat ▶ suivant' : 'Terminer le combat ▶ classement';
+  const what = isTeamDisc(pool) ? 'la rencontre' : isKataDisc(pool) ? 'le tour' : 'le combat';
+  $('flFinish').textContent = nextUnplayed(pool, pool.current) >= 0 ? `Terminer ${what} ▶ suivant` : `Terminer ${what} ▶ classement`;
+  $('flHajime').textContent = isKataDisc(pool) ? 'Afficher le tatami' : 'Afficher le score';
   const np = allDone ? nextPool() : null;
   $('flNextPool').hidden = !np;
   if (np) $('flNextPool').textContent = `Pool suivant : ${np.name} ▶`;
-  $('pvName').textContent = `Sur le tatami : ${pool.name} – ${pool.participants.length} compétiteurs`;
+  $('pvName').textContent = `Sur le tatami : ${pool.name} – ${DISCIPLINES[discOf(pool)]}, ${unitWord(pool, pool.participants.length)}`;
+  const C = rankCols(pool);
+  document.querySelector('#poolView [data-h="pf"]').textContent = C.pf; document.querySelector('#poolView [data-h="pa"]').textContent = C.pa;
   const pn = i => i == null ? '<i style="color:var(--muted)">à déterminer</i>' : esc(pool.participants[i].name);
   const order = pool.matches.map((m,i) => i).filter(i => !isBye(pool.matches[i]));
   if (pool.format === 'ko') order.sort((x,y) => koOrderKey(pool, pool.matches[x]) - koOrderKey(pool, pool.matches[y]));
@@ -428,11 +638,13 @@ function renderPool(){
     const lbl = pool.format === 'ko' ? matchLabel(pool, m) : i+1;
     const btn = i === pool.current || !(playable(m) || r) ? '' : (r && !canReplay(pool, i)) ? '' : `<button class="btn sm" data-load="${i}">${r ? 'Rejouer' : 'Charger'}</button>`;
     return `<tr class="${i===pool.current?'cur':''}"><td style="white-space:nowrap">${lbl}</td>
-      <td class="${r && r.winner==='aka'?'wa':''}">${pn(m.a)}</td><td class="res">${r ? `${r.sa} – ${r.sb}` : '–'}</td>
+      <td class="${r && r.winner==='aka'?'wa':''}">${pn(m.a)}</td><td class="res">${r ? resText(r) : '–'}</td>
       <td class="${r && r.winner==='ao'?'wb':''}">${pn(m.b)}</td><td>${stt}</td><td class="acts">${btn}</td></tr>`;
   }).join('');
-  $('pvRanking').innerHTML = poolTable(pool).map(p => `<tr><td>${p.rank ?? '–'}</td><td><b>${esc(p.name)}</b><br><small style="color:var(--muted)">${esc(p.dojo)}${pool.format === 'ko' ? ' · ' + esc(p.label) : ''}</small></td><td>${p.w}</td><td>${p.l}</td><td>${p.pf}</td><td>${p.pa}</td></tr>`).join('');
-  $('pvHint').textContent = pool.format === 'ko'
+  $('pvRanking').innerHTML = poolTable(pool).map(p => `<tr><td>${p.rank ?? '–'}</td><td><b>${esc(p.name)}</b><br><small style="color:var(--muted)">${esc(p.dojo)}${pool.format === 'ko' ? ' · ' + esc(p.label) : ''}</small></td><td>${p.w}${p.d ? ` <small>(+${p.d} N)</small>` : ''}</td><td>${p.l}</td><td>${fmtPts(p.pf)}</td><td>${fmtPts(p.pa)}</td></tr>`).join('');
+  $('pvHint').textContent = isKataDisc(pool) ? `Kata – ${KATA_SYSTEMS[(pool.kata || {}).system || 'votes']}. Classement : victoires, confrontation directe, puis ${C.pf.replace(' +', '').toLowerCase()}.`
+    : discOf(pool) === 'kumite_team' ? `Kumite par équipe – ${pool.bouts || 3} combats par rencontre. ${pool.format === 'ko' ? '' : 'Classement : 3 pts par victoire, 1 par nul, puis combats gagnés.'}`
+    : pool.format === 'ko'
     ? (pool.repechage ? 'Élimination directe avec repêchage WKF.' : 'Élimination directe sans repêchage.')
     : (pool.ranking === 'points' ? 'Classement aux points marqués.' : 'Classement standard : victoires, confrontation directe, points marqués, points encaissés.');
 }
@@ -506,7 +718,7 @@ function applySettings(ts){
   const sig = JSON.stringify(ts);
   if (sig === cache.settingsSig) return;
   cache.settingsSig = sig;
-  for (const k of ['wkf', 'k4x15', 'promo']) if (ts[k]) state.settings[k] = Object.assign({}, state.settings[k], ts[k]);
+  for (const k of ['wkf', 'k4x15', 'promo', 'kata']) if (ts[k]) state.settings[k] = Object.assign({}, state.settings[k], ts[k]);
   const ds = clone(DEFAULT_SETTINGS.sounds), ss = ts.sounds || {};
   state.settings.sounds = { atoshi: ss.atoshi || ds.atoshi, end: ss.end || ds.end, call: ss.call || ds.call, voice: Object.assign(ds.voice, ss.voice || {}) };
   ensureSoundFiles();
@@ -539,7 +751,7 @@ async function sync(){
     replacePoolData(entry, mergePool(p.data, entry.data));
     entry.version = p.version; changed = true;
     if (state.pool === entry.data){
-      state.mode = entry.data.mode || state.mode; state.category = entry.data.name;
+      state.mode = isKataDisc(entry.data) ? 'kata' : (entry.data.mode || state.mode); state.category = entry.data.name;
       if (entry.data.current < 0 && state.screen === 'callup') state.screen = entry.data.format === 'ko' ? 'bracket' : 'list';
     }
   }
@@ -560,7 +772,13 @@ async function pushLive(force){
   const pool = state.pool, m = pool && pool.current >= 0 ? pool.matches[pool.current] : null;
   const live = { mode: state.mode, aka: state.aka, ao: state.ao, winner: state.winner, phase: state.phase, screen: state.screen, category: state.category,
     timer: { running: state.timer.running, remaining: Math.round(remainingNow()) },
-    poolId: pool ? pool.id : null, poolName: pool ? pool.name : '', matchLabel: m ? matchLabel(pool, m) : '' };
+    poolId: pool ? pool.id : null, poolName: pool ? pool.name : '', matchLabel: m ? matchLabel(pool, m) : '',
+    discipline: pool ? discOf(pool) : (state.mode === 'kata' ? 'kata' : 'kumite') };
+  if (state.mode === 'kata' && state.kata){
+    const K = state.kata;
+    live.kata = K.reveal ? K : { system: K.system, judges: K.judges, timer: K.timer, kataA: K.kataA, kataB: K.kataB, reveal: false, flags: [], sa: [], sb: [] };
+  }
+  if (state.team) live.team = { nameA: state.team.nameA, nameB: state.team.nameB, n: state.team.n, rr: state.team.rr, bouts: state.team.bouts };
   try { await Api.call('live_push', { state: live }, { timeout: 5000 }); setOnline(true); }
   catch(err){ liveDirty = true; if (err.code === 'auth') return handleAuth(); if (err.code === 'network') setOnline(false); }
 }

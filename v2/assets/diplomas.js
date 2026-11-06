@@ -58,11 +58,17 @@ function recipients(){
     if (!sel.has(p.id) || p.participants.length < 1) continue;
     const done = poolDone(p) && realMatches(p).length > 0;
     const medals = done || $('dUnfinished').checked;
-    const T = hasResults(p) ? poolTable(p) : p.participants.map(x => ({ name: x.name, dojo: x.dojo, rank: null }));
+    const T = hasResults(p) ? poolTable(p) : p.participants.map((x, i) => ({ i, name: x.name, dojo: x.dojo, rank: null }));
+    const team = isTeamDisc(p);
     for (const r of T){
       const k = medals && r.rank != null ? KIND_OF_RANK(r.rank) : null;
-      if (k && k !== 'part' && kinds.has(k)) out.push({ kind: k, rank: r.rank, name: r.name, dojo: r.dojo, pool: p.name });
-      if (kinds.has('part') && (partAll || (done && (!k || k === 'part')))) out.push({ kind: 'part', rank: r.rank, name: r.name, dojo: r.dojo, pool: p.name });
+      // équipe : un diplôme par membre, le nom de l'équipe sur la ligne du club
+      const part = p.participants[r.i] || {};
+      const people = team ? ((part.members || []).length ? part.members.map(m => ({ name: m.name, dojo: r.name + (r.dojo ? ' – ' + r.dojo : '') })) : [{ name: r.name, dojo: r.dojo }]) : [{ name: r.name, dojo: r.dojo }];
+      for (const x of people){
+        if (k && k !== 'part' && kinds.has(k)) out.push({ kind: k, rank: r.rank, name: x.name, dojo: x.dojo, pool: p.name });
+        if (kinds.has('part') && (partAll || (done && (!k || k === 'part')))) out.push({ kind: 'part', rank: r.rank, name: x.name, dojo: x.dojo, pool: p.name });
+      }
     }
   }
   return out;
@@ -70,7 +76,7 @@ function recipients(){
 function renderPools(){
   $('dPools').innerHTML = pools.length ? pools.map(p => {
     const done = poolDone(p) && realMatches(p).length > 0;
-    return `<label><input type="checkbox" data-pool="${p.id}" ${done ? 'checked' : ''}> ${esc(p.name)} <small>${done ? 'terminé' : hasResults(p) ? 'en cours' : 'pas commencé'} · ${p.participants.length}</small></label>`;
+    return `<label><input type="checkbox" data-pool="${p.id}" ${done ? 'checked' : ''}> ${esc(p.name)} <small>${done ? 'terminé' : hasResults(p) ? 'en cours' : 'pas commencé'} · ${isTeamDisc(p) ? unitWord(p, p.participants.length) + ', 1 diplôme par membre' : p.participants.length}</small></label>`;
   }).join('') : '<span class="hint">Aucun pool dans ce tournoi.</span>';
 }
 
